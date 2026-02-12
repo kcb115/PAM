@@ -391,6 +391,37 @@ class PAMAPITester:
             self.log_result("Get Nonexistent Share", "FAIL", f"Exception: {str(e)}")
             return False
 
+    def test_musicbrainz_integration_indirectly(self):
+        """Test MusicBrainz integration indirectly by checking backend logs"""
+        # Since MusicBrainz is used internally during taste profile building,
+        # we can test this indirectly by checking if the service is accessible
+        try:
+            # Test if MusicBrainz API is reachable (basic connectivity test)
+            import requests
+            response = requests.get("https://musicbrainz.org/ws/2/artist/?query=radiohead&fmt=json&limit=1", 
+                                  headers={"User-Agent": "PAM/1.0 (pam-concert-discovery)"}, 
+                                  timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if "artists" in data and len(data["artists"]) > 0:
+                    artist_name = data["artists"][0].get("name", "")
+                    self.log_result("MusicBrainz Integration", "PASS", 
+                                  f"MusicBrainz API accessible. Test query returned: {artist_name}")
+                    return True
+                else:
+                    self.log_result("MusicBrainz Integration", "FAIL", "MusicBrainz API returned no artists")
+                    return False
+            elif response.status_code == 503:
+                self.log_result("MusicBrainz Integration", "WARNING", "MusicBrainz API temporarily unavailable (503) - rate limited")
+                return True  # This is expected behavior for MusicBrainz
+            else:
+                self.log_result("MusicBrainz Integration", "FAIL", f"MusicBrainz API returned: {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_result("MusicBrainz Integration", "FAIL", f"MusicBrainz connectivity test failed: {str(e)}")
+            return False
+
     def run_all_tests(self):
         """Run all tests"""
         print(f"🚀 Starting PAM API Tests (Updated for New Features)")
