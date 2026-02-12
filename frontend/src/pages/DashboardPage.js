@@ -388,7 +388,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
             className="mt-8 glass-card p-4 flex items-center gap-3"
             data-testid="share-url-display"
           >
-            <Share2 className="w-4 h-4 text-amber-500 shrink-0" />
+            <Share2 className="w-4 h-4 text-[#380E75] shrink-0" />
             <code className="flex-1 font-mono text-xs text-zinc-400 truncate">
               {shareUrl}
             </code>
