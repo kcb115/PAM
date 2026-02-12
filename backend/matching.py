@@ -107,6 +107,7 @@ async def match_and_rank_concerts(
 ) -> List[ConcertMatch]:
     """
     Match and rank concert events against user's taste profile.
+    Handles both external API events and Spotify-discovered events.
     """
     results = []
     known_artist_names_lower = {n.lower() for n in taste_profile.top_artist_names}
@@ -122,21 +123,23 @@ async def match_and_rank_concerts(
         if primary_artist.lower() in known_artist_names_lower:
             continue
 
-        # Search Spotify for artist info
-        try:
-            search_result = await spotify_service.search_artist(access_token, primary_artist)
-            artists_found = search_result.get("artists", {}).get("items", [])
-        except Exception as e:
-            logger.warning(f"Spotify search failed for '{primary_artist}': {e}")
-            artists_found = []
+        # Check if event already has genre/popularity data (from Spotify discovery)
+        artist_genres = event.get("genres", [])
+        spotify_popularity = event.get("popularity")
 
-        artist_genres = []
-        spotify_popularity = None
+        # If no genre data, search Spotify
+        if not artist_genres:
+            try:
+                search_result = await spotify_service.search_artist(access_token, primary_artist)
+                artists_found = search_result.get("artists", {}).get("items", [])
+            except Exception as e:
+                logger.warning(f"Spotify search failed for '{primary_artist}': {e}")
+                artists_found = []
 
-        if artists_found:
-            best_match = artists_found[0]
-            artist_genres = best_match.get("genres", [])
-            spotify_popularity = best_match.get("popularity")
+            if artists_found:
+                best_match = artists_found[0]
+                artist_genres = best_match.get("genres", [])
+                spotify_popularity = best_match.get("popularity")
 
         # Compute genre match score
         score, matched_terms, explanation = compute_genre_match_score(
@@ -165,6 +168,8 @@ async def match_and_rank_concerts(
             event_url=event.get("event_url", ""),
             spotify_popularity=spotify_popularity,
             image_url=event.get("image_url", ""),
+            featured_track=event.get("featured_track", ""),
+            source=event.get("source", "discovery"),
         ))
 
     # Sort by match score descending
