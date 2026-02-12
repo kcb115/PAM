@@ -117,17 +117,17 @@ export default function LandingPage({ user }) {
         >
           {[
             {
-              icon: <Radio className="w-5 h-5 text-amber-500" />,
+              icon: <Radio className="w-5 h-5 text-[#DED5EB]" />,
               title: "Taste Fingerprint",
               desc: "We build a deep profile from your top artists, genres, and audio preferences.",
             },
             {
-              icon: <MapPin className="w-5 h-5 text-teal-500" />,
+              icon: <MapPin className="w-5 h-5 text-[#380E75]" />,
               title: "Local Discovery",
               desc: "Search concerts in your city. Filter by radius. Find hidden gems nearby.",
             },
             {
-              icon: <Sparkles className="w-5 h-5 text-amber-500" />,
+              icon: <Sparkles className="w-5 h-5 text-[#DED5EB]" />,
               title: "Smart Matching",
               desc: "Our algorithm scores every event against your taste. No noise, just signal.",
             },
