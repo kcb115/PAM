@@ -40,7 +40,7 @@ export const LocationSearch = ({ onSearch, loading, defaultCity, defaultRadius }
   return (
     <div data-testid="location-search">
       <div className="mb-6">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-teal-500/80 mb-1">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#DED5EB]/80 mb-1">
           Discover
         </p>
         <h2 className="font-syne text-2xl md:text-3xl font-bold tracking-tight">
