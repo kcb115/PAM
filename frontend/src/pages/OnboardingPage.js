@@ -252,7 +252,7 @@ export default function OnboardingPage({ onSaveUser }) {
                   <Button
                     onClick={handleSubmit}
                     disabled={loading}
-                    className="flex-1 spotify-btn py-6 text-base"
+                    className="flex-1 bg-[#380E75] text-[#DED5EB] font-syne font-bold uppercase tracking-wider rounded-full py-6 text-base hover:bg-[#380E75]/80 transition-all duration-200 hover:shadow-[0_0_25px_rgba(56,14,117,0.4)] disabled:opacity-50"
                     data-testid="connect-spotify-btn"
                   >
                     {loading ? (
