@@ -7,7 +7,7 @@ import os
 import logging
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from models import (
     User, UserCreate, UserUpdate, TasteProfile,
