@@ -10,7 +10,6 @@ import { LocationSearch } from "@/components/pam/LocationSearch";
 import { ConcertList } from "@/components/pam/ConcertList";
 import { FavoritesList } from "@/components/pam/FavoritesList";
 import { LoadingState } from "@/components/pam/LoadingState";
-import { EventsApiSetup } from "@/components/pam/EventsApiSetup";
 import { motion } from "framer-motion";
 
 export default function DashboardPage({ user, onSaveUser, onLogout }) {
