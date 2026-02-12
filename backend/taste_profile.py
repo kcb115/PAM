@@ -140,6 +140,24 @@ async def build_taste_profile(user_id: str, access_token: str) -> TasteProfile:
     short_items = short_artists.get("items", [])
     medium_items = medium_artists.get("items", [])
 
+    # Check if Spotify returned genres (they often don't since late 2024)
+    has_spotify_genres = any(
+        a.get("genres") for a in short_items + medium_items
+    )
+
+    if not has_spotify_genres:
+        logger.info("Spotify returned empty genres. Enriching via MusicBrainz...")
+        all_names = list({a["name"] for a in short_items + medium_items})
+        # Look up first 30 artists to stay within rate limits
+        mb_genres = await musicbrainz_service.get_genres_for_artists(all_names[:30])
+
+        # Inject MusicBrainz genres into artist items
+        for item_list in [short_items, medium_items]:
+            for artist in item_list:
+                name = artist.get("name", "")
+                if not artist.get("genres") and name in mb_genres:
+                    artist["genres"] = mb_genres[name]
+
     # Build genre maps (short_term weighted more heavily - recent taste)
     short_genre, short_root = build_genre_map(short_items, time_range_weight=1.5)
     medium_genre, medium_root = build_genre_map(medium_items, time_range_weight=1.0)
