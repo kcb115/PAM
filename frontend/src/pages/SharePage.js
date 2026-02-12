@@ -50,7 +50,7 @@ export default function SharePage() {
           <p className="text-zinc-400 mb-4">{error || "Profile not found."}</p>
           <Button
             onClick={() => navigate("/")}
-            className="bg-amber-500 text-black font-syne font-bold rounded-full px-8 py-6"
+            className="bg-[#380E75] text-[#DED5EB] font-syne font-bold rounded-full px-8 py-6"
           >
             Discover Your Taste
           </Button>
@@ -82,13 +82,13 @@ export default function SharePage() {
   return (
     <div className="hero-gradient min-h-screen" data-testid="share-page">
       {/* Ambient lights */}
-      <div className="absolute top-0 left-[20%] w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 right-[10%] w-[400px] h-[400px] bg-teal-500/4 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-0 left-[20%] w-[500px] h-[500px] bg-[#380E75]/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-0 right-[10%] w-[400px] h-[400px] bg-[#DED5EB]/4 rounded-full blur-[100px] pointer-events-none" />
 
       <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
-          <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center">
-            <Music className="w-4 h-4 text-black" />
+          <div className="w-8 h-8 rounded-lg bg-[#380E75] flex items-center justify-center">
+            <Music className="w-4 h-4 text-[#DED5EB]" />
           </div>
           <span className="font-syne font-extrabold text-xl tracking-tight">PAM</span>
         </div>
@@ -102,13 +102,13 @@ export default function SharePage() {
         >
           {/* Header */}
           <div className="text-center mb-10">
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-amber-500/80 mb-3">
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#DED5EB]/80 mb-3">
               Taste Profile
             </p>
             <h1 className="font-syne text-4xl md:text-5xl font-extrabold tracking-tight mb-3">
               {share.user_name}'s
               <br />
-              <span className="text-amber-500">Sound DNA</span>
+              <span className="text-[#DED5EB]">Sound DNA</span>
             </h1>
             <p className="text-zinc-500 text-sm">
               Based on {share.top_artist_count} top artists
@@ -127,9 +127,9 @@ export default function SharePage() {
                   />
                   <Radar
                     dataKey="value"
-                    stroke="#f59e0b"
-                    fill="#f59e0b"
-                    fillOpacity={0.15}
+                    stroke="#DED5EB"
+                    fill="#380E75"
+                    fillOpacity={0.25}
                     strokeWidth={2}
                   />
                 </RadarChart>
@@ -144,7 +144,7 @@ export default function SharePage() {
                 if (!info) return null;
                 return (
                   <div key={key} className="flex items-center gap-2">
-                    <span className="text-amber-500">{info.icon}</span>
+                    <span className="text-[#DED5EB]">{info.icon}</span>
                     <div className="flex-1">
                       <div className="flex justify-between text-xs mb-1">
                         <span className="text-zinc-400">{info.label}</span>
@@ -152,7 +152,7 @@ export default function SharePage() {
                       </div>
                       <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-amber-500"
+                          className="h-full rounded-full bg-[#DED5EB]"
                           style={{ width: `${Math.round(val * 100)}%` }}
                         />
                       </div>
@@ -179,7 +179,7 @@ export default function SharePage() {
                       className="h-full rounded-full"
                       style={{
                         width: `${Math.round(weight * 100)}%`,
-                        background: weight > 0.6 ? "#f59e0b" : weight > 0.3 ? "#14b8a6" : "#3f3f46",
+                        background: weight > 0.6 ? "#DED5EB" : weight > 0.3 ? "#380E75" : "#3f3f46",
                       }}
                     />
                   </div>
