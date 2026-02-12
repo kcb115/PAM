@@ -168,7 +168,7 @@ export default function OnboardingPage({ onSaveUser }) {
 
                 <Button
                   onClick={handleNext}
-                  className="w-full mt-8 bg-amber-500 text-black font-syne font-bold uppercase tracking-wider rounded-full py-6 hover:bg-amber-400 transition-colors duration-200"
+                  className="w-full mt-8 bg-[#380E75] text-[#DED5EB] font-syne font-bold uppercase tracking-wider rounded-full py-6 hover:bg-[#380E75]/80 transition-colors duration-200"
                   data-testid="next-step-btn"
                 >
                   Continue
