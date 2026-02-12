@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LandingPage from "@/pages/LandingPage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import DashboardPage from "@/pages/DashboardPage";
+import SharePage from "@/pages/SharePage";
 import { Toaster } from "@/components/ui/sonner";
 
 function App() {
@@ -43,6 +44,7 @@ function App() {
               />
             }
           />
+          <Route path="/share/:shareId" element={<SharePage />} />
         </Routes>
       </BrowserRouter>
     </div>
