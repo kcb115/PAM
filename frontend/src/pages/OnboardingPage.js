@@ -233,7 +233,7 @@ export default function OnboardingPage({ onSaveUser }) {
                         className="flex-1"
                         data-testid="budget-slider"
                       />
-                      <span className="font-mono text-amber-500 text-lg font-bold w-16 text-right" data-testid="budget-value">
+                      <span className="font-mono text-[#DED5EB] text-lg font-bold w-16 text-right" data-testid="budget-value">
                         ${form.ticket_budget}
                       </span>
                     </div>
