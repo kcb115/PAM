@@ -73,7 +73,7 @@ export default function LandingPage({ user }) {
           >
             Find your next
             <br />
-            <span className="text-amber-500">favorite show</span>
+            <span className="text-[#DED5EB]">favorite show</span>
           </motion.h1>
 
           <motion.p
