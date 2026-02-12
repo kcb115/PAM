@@ -20,4 +20,13 @@ export const api = {
 
   // Concert Discovery
   discoverConcerts: (data) => axios.post(`${API}/concerts/discover`, data),
+
+  // Favorites
+  addFavorite: (data) => axios.post(`${API}/favorites`, data),
+  getFavorites: (userId) => axios.get(`${API}/favorites/${userId}`),
+  removeFavorite: (favoriteId) => axios.delete(`${API}/favorites/${favoriteId}`),
+
+  // Share
+  createShare: (userId) => axios.post(`${API}/share/create?user_id=${userId}`),
+  getShare: (shareId) => axios.get(`${API}/share/${shareId}`),
 };
