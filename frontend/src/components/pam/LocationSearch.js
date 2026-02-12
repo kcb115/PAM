@@ -94,7 +94,7 @@ export const LocationSearch = ({ onSearch, loading, defaultCity, defaultRadius }
               <Button
                 type="submit"
                 disabled={loading || !city.trim()}
-                className="w-full sm:w-auto bg-teal-500 text-black font-syne font-bold uppercase tracking-wider rounded-full h-12 px-8 hover:bg-teal-400 transition-colors duration-200 disabled:opacity-50"
+                className="w-full sm:w-auto bg-[#380E75] text-[#DED5EB] font-syne font-bold uppercase tracking-wider rounded-full h-12 px-8 hover:bg-[#380E75]/80 transition-colors duration-200 disabled:opacity-50"
                 data-testid="discover-btn"
               >
                 {loading ? (
