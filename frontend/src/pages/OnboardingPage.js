@@ -107,7 +107,7 @@ export default function OnboardingPage({ onSaveUser }) {
               <div
                 key={s}
                 className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
-                  s <= step ? "bg-amber-500" : "bg-white/10"
+                  s <= step ? "bg-[#380E75]" : "bg-white/10"
                 }`}
                 data-testid={`progress-step-${s}`}
               />
