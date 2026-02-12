@@ -342,8 +342,6 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
               </TabsList>
 
               <TabsContent value="discover">
-                <EventsApiSetup />
-
                 <LocationSearch
                   onSearch={handleDiscover}
                   loading={loading === "discover"}
