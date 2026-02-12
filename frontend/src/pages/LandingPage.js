@@ -32,8 +32,8 @@ export default function LandingPage({ user }) {
       {/* Nav */}
       <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center">
-            <Music className="w-4 h-4 text-black" />
+          <div className="w-8 h-8 rounded-lg bg-[#380E75] flex items-center justify-center">
+            <Music className="w-4 h-4 text-[#DED5EB]" />
           </div>
           <span className="font-syne font-extrabold text-xl tracking-tight">PAM</span>
         </div>
