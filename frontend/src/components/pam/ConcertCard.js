@@ -164,6 +164,23 @@ export const ConcertCard = ({ concert, rank, onFavorite, isFavorited }) => {
 
           {/* Actions row */}
           <div className="flex items-center gap-3 mt-4">
+            {onFavorite && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onFavorite(concert)}
+                className={`text-xs font-mono rounded-full ${
+                  isFavorited
+                    ? "text-red-400 bg-red-500/10"
+                    : "text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
+                }`}
+                data-testid={`favorite-btn-${rank}`}
+              >
+                <Heart className={`w-3.5 h-3.5 mr-1 ${isFavorited ? "fill-current" : ""}`} />
+                {isFavorited ? "Saved" : "Save"}
+              </Button>
+            )}
+
             {(ticket_url || event_url) && (
               <a
                 href={ticket_url || event_url}
@@ -198,6 +215,14 @@ export const ConcertCard = ({ concert, rank, onFavorite, isFavorited }) => {
               )}
             </Button>
           </div>
+
+          {/* Featured track */}
+          {featured_track && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-zinc-500">
+              <Music2 className="w-3 h-3 text-teal-500" />
+              <span className="font-mono">Featured: {featured_track}</span>
+            </div>
+          )}
 
           {/* Expandable explanation */}
           {expanded && (
