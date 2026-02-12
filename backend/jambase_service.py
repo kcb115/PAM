@@ -1,140 +1,234 @@
 """
-Jambase API service.
-Handles event search with caching.
+Jambase Events API v1 service.
+Base URL: https://www.jambase.com/jb-api/v1/events
+Uses lat/lng geo search with genre filtering.
 """
 import os
 import logging
 import httpx
 from cachetools import TTLCache
-from typing import Optional
+from datetime import datetime, timezone
+from typing import List, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-JAMBASE_API_BASE = "https://apiv3.jambase.com"
+JAMBASE_API = "https://www.jambase.com/jb-api/v1/events"
 
-# Cache events for 30 minutes per location key
-_event_cache = TTLCache(maxsize=100, ttl=1800)
+# Cache events for 1 hour per location+genre key
+_event_cache = TTLCache(maxsize=200, ttl=3600)
+
+# Mapping from root genres to Jambase genre slugs
+ROOT_TO_JAMBASE_SLUG = {
+    "indie": "indie",
+    "folk": "folk",
+    "jazz": "jazz",
+    "blues": "blues",
+    "rock": "rock",
+    "pop": "pop",
+    "punk": "punk",
+    "metal": "metal",
+    "electronic": "edm",
+    "dance": "edm",
+    "house": "edm",
+    "techno": "edm",
+    "hip hop": "hip-hop-rap",
+    "rap": "hip-hop-rap",
+    "country": "country-music",
+    "bluegrass": "bluegrass",
+    "r&b": "rhythm-and-blues-soul",
+    "soul": "rhythm-and-blues-soul",
+    "reggae": "reggae",
+    "latin": "latin",
+    "classical": "classical",
+    "gospel": "christian",
+}
 
 
-def _cache_key(city: str, radius: int) -> str:
-    return f"{city.lower().strip()}:{radius}"
+def get_jambase_slugs_for_profile(root_genre_map: Dict[str, float], max_slugs: int = 5) -> List[str]:
+    """Map a user's root genre map to Jambase genre slugs, ordered by weight."""
+    slug_weights = {}
+    for genre, weight in root_genre_map.items():
+        slug = ROOT_TO_JAMBASE_SLUG.get(genre.lower())
+        if slug:
+            slug_weights[slug] = slug_weights.get(slug, 0) + weight
+
+    sorted_slugs = sorted(slug_weights.items(), key=lambda x: x[1], reverse=True)
+    return [s[0] for s in sorted_slugs[:max_slugs]]
 
 
-async def search_events(city: str, radius: int = 25, page: int = 0) -> dict:
-    """Search for upcoming events near a city using Jambase API."""
-    cache_key = _cache_key(city, radius)
-    if cache_key in _event_cache and page == 0:
-        logger.info(f"Cache hit for events in {city}")
-        return _event_cache[cache_key]
-
-    api_key = os.environ.get("JAMBASE_API_KEY", "")
-    if not api_key:
-        logger.error("JAMBASE_API_KEY not configured")
-        return {"events": [], "error": "Jambase API key not configured"}
-
+async def _fetch_page(
+    api_key: str,
+    lat: float,
+    lng: float,
+    radius: int,
+    genre_slug: Optional[str],
+    date_from: str,
+    date_to: Optional[str],
+    page: int,
+    per_page: int,
+) -> dict:
+    """Fetch a single page of events from Jambase."""
     params = {
         "apikey": api_key,
-        "geoCity": city,
-        "geoRadius": str(radius),
-        "eventDateFrom": "today",
+        "geoLatitude": str(lat),
+        "geoLongitude": str(lng),
+        "geoRadiusAmount": str(radius),
+        "geoRadiusUnits": "mi",
+        "eventType": "concerts",
+        "eventDateFrom": date_from,
         "page": str(page),
+        "perPage": str(per_page),
     }
+    if date_to:
+        params["eventDateTo"] = date_to
+    if genre_slug:
+        params["genreSlug"] = genre_slug
 
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{JAMBASE_API_BASE}/events",
-                params=params,
-                timeout=20.0,
-            )
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(JAMBASE_API, params=params, timeout=20.0)
 
-            if resp.status_code == 429:
-                logger.warning("Jambase rate limited")
-                return {"events": [], "error": "Rate limited. Try again shortly."}
+        if resp.status_code == 429:
+            logger.warning("Jambase rate limited")
+            return {"events": [], "pagination": {}}
+        if resp.status_code != 200:
+            logger.error(f"Jambase API error {resp.status_code}: {resp.text[:200]}")
+            return {"events": [], "pagination": {}}
 
-            if resp.status_code != 200:
-                logger.error(f"Jambase API error: {resp.status_code} - {resp.text[:200]}")
-                return {"events": [], "error": f"Jambase API error: {resp.status_code}"}
-
-            data = resp.json()
-            result = _parse_events(data)
-
-            if page == 0:
-                _event_cache[cache_key] = result
-
-            return result
-
-    except httpx.TimeoutException:
-        logger.error("Jambase API timeout")
-        return {"events": [], "error": "Jambase API timeout"}
-    except Exception as e:
-        logger.error(f"Jambase API error: {e}")
-        return {"events": [], "error": str(e)}
+        return resp.json()
 
 
-def _parse_events(data: dict) -> dict:
-    """Parse Jambase API response into normalized event list."""
-    events = []
-    raw_events = data.get("Events", data.get("events", []))
+def _parse_event(event: dict) -> dict:
+    """Parse a single Jambase Concert object into our normalized format."""
+    # Performer info
+    performers = event.get("performer", [])
+    artist_names = []
+    genres = []
+    for p in performers:
+        name = p.get("name", "")
+        if name:
+            artist_names.append(name)
+        for g in p.get("genre", []):
+            if g and g.lower() not in genres:
+                genres.append(g.lower())
 
-    for event in raw_events:
-        # Handle different response formats
-        venue = event.get("Venue", event.get("venue", {}))
-        location = event.get("Location", event.get("location", {}))
+    if not artist_names:
+        artist_names = [event.get("name", "Unknown")]
 
-        # Extract performer/artist info
-        performers = event.get("Performers", event.get("performers",
-                     event.get("performer", [])))
-        if isinstance(performers, dict):
-            performers = [performers]
+    # Venue info
+    location = event.get("location", {})
+    venue_name = location.get("name", "Unknown Venue")
+    address = location.get("address", {})
+    venue_city = address.get("addressLocality", "")
+    region = address.get("addressRegion", {})
+    venue_state = region.get("alternateName", "") if isinstance(region, dict) else ""
+    if venue_state:
+        venue_city = f"{venue_city}, {venue_state}"
 
-        artist_names = []
-        for p in performers:
-            name = p.get("Name", p.get("name", ""))
-            if name:
-                artist_names.append(name)
+    # Date/time
+    start_date = event.get("startDate", "")
+    door_time = event.get("doorTime", "")
 
-        if not artist_names:
-            event_name = event.get("Name", event.get("name", ""))
-            if event_name:
-                artist_names = [event_name]
+    # URLs
+    event_url = event.get("url", "")
+    ticket_url = ""
+    for offer in event.get("offers", []):
+        url = offer.get("url", "")
+        if url:
+            ticket_url = url
+            break
+    if not ticket_url:
+        ticket_url = event_url
 
-        venue_name = venue.get("Name", venue.get("name", "Unknown Venue"))
-        venue_city = ""
-        if isinstance(location, dict):
-            venue_city = location.get("City", location.get("city", ""))
-        elif isinstance(venue, dict) and "Location" in venue:
-            venue_city = venue["Location"].get("City", "")
+    # Image
+    image_url = event.get("image", "")
 
-        # Extract date
-        date_str = event.get("Date", event.get("date",
-                   event.get("startDate", event.get("DateStart", ""))))
-
-        # Extract ticket/event URLs
-        ticket_url = event.get("TicketUrl", event.get("ticketUrl",
-                     event.get("Url", event.get("url", ""))))
-        event_url = event.get("Url", event.get("url", ""))
-
-        # Get image
-        image = event.get("Image", event.get("image", ""))
-        if isinstance(image, dict):
-            image = image.get("Url", image.get("url", ""))
-
-        event_id = str(event.get("Id", event.get("id", event.get("@id", ""))))
-
-        events.append({
-            "event_id": event_id,
-            "artist_names": artist_names,
-            "venue_name": venue_name,
-            "venue_city": venue_city,
-            "date": date_str,
-            "ticket_url": ticket_url,
-            "event_url": event_url,
-            "image_url": image if isinstance(image, str) else "",
-        })
+    # Event ID
+    event_id = event.get("identifier", "")
 
     return {
-        "events": events,
-        "total": len(events),
-        "pagination": data.get("Pagination", data.get("pagination", {})),
+        "event_id": event_id,
+        "artist_names": artist_names,
+        "genres": genres,
+        "popularity": None,
+        "venue_name": venue_name,
+        "venue_city": venue_city,
+        "date": start_date,
+        "time": door_time,
+        "ticket_url": ticket_url,
+        "event_url": event_url,
+        "image_url": image_url,
+        "featured_track": "",
+        "source": "jambase",
+    }
+
+
+async def search_events(
+    lat: float,
+    lng: float,
+    radius: int = 25,
+    genre_slugs: Optional[List[str]] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    max_pages: int = 3,
+    per_page: int = 50,
+) -> dict:
+    """
+    Search for upcoming concerts near coordinates.
+    If genre_slugs provided, makes separate calls per genre and deduplicates.
+    """
+    api_key = os.environ.get("JAMBASE_API_KEY", "")
+    if not api_key:
+        return {"events": [], "error": "no_key", "total": 0}
+
+    if not date_from:
+        date_from = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    all_events = {}  # keyed by event_id to deduplicate
+
+    # If genre slugs provided, query per genre for better relevance
+    slugs_to_query = genre_slugs if genre_slugs else [None]
+
+    for slug in slugs_to_query:
+        cache_key = f"{lat:.2f}:{lng:.2f}:{radius}:{slug or 'all'}:{date_from}"
+        if cache_key in _event_cache:
+            cached = _event_cache[cache_key]
+            for ev in cached:
+                all_events[ev["event_id"]] = ev
+            continue
+
+        slug_events = []
+        for page in range(1, max_pages + 1):
+            try:
+                data = await _fetch_page(
+                    api_key, lat, lng, radius, slug, date_from, date_to, page, per_page
+                )
+            except Exception as e:
+                logger.error(f"Jambase fetch failed (slug={slug}, page={page}): {e}")
+                break
+
+            if not data.get("success", data.get("events")):
+                break
+
+            raw_events = data.get("events", [])
+            if not raw_events:
+                break
+
+            for raw in raw_events:
+                parsed = _parse_event(raw)
+                slug_events.append(parsed)
+                all_events[parsed["event_id"]] = parsed
+
+            # Check if more pages
+            pagination = data.get("pagination", {})
+            total_pages = pagination.get("totalPages", 1)
+            if page >= total_pages:
+                break
+
+        _event_cache[cache_key] = slug_events
+
+    events_list = list(all_events.values())
+    return {
+        "events": events_list,
+        "total": len(events_list),
+        "source": "jambase",
     }
