@@ -1,7 +1,7 @@
 import { ConcertCard } from "./ConcertCard";
 import { MapPin, AlertCircle } from "lucide-react";
 
-export const ConcertList = ({ concerts, message, totalScanned }) => {
+export const ConcertList = ({ concerts, message, totalScanned, onFavorite, favoriteIds }) => {
   return (
     <div data-testid="concert-list">
       <div className="flex items-center justify-between mb-6">
@@ -15,7 +15,7 @@ export const ConcertList = ({ concerts, message, totalScanned }) => {
         </div>
         {totalScanned > 0 && (
           <span className="font-mono text-xs text-zinc-600" data-testid="events-scanned-count">
-            {totalScanned} events scanned
+            {totalScanned} artists discovered
           </span>
         )}
       </div>
@@ -23,7 +23,13 @@ export const ConcertList = ({ concerts, message, totalScanned }) => {
       {concerts.length > 0 ? (
         <div className="space-y-4">
           {concerts.map((concert, index) => (
-            <ConcertCard key={concert.event_id || index} concert={concert} rank={index + 1} />
+            <ConcertCard
+              key={concert.event_id || index}
+              concert={concert}
+              rank={index + 1}
+              onFavorite={onFavorite}
+              isFavorited={favoriteIds?.has(concert.event_id)}
+            />
           ))}
         </div>
       ) : message ? (
