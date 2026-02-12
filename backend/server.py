@@ -11,12 +11,13 @@ from typing import Optional
 
 from models import (
     User, UserCreate, UserUpdate, TasteProfile,
-    DiscoverRequest, DiscoverResponse,
+    DiscoverRequest, DiscoverResponse, FavoriteCreate, Favorite, ShareProfile,
 )
 import spotify_service
 import taste_profile as tp
 import jambase_service
 import matching
+import event_discovery
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
