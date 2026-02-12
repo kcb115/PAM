@@ -55,7 +55,7 @@ export const LoadingState = ({ type }) => {
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="w-1.5 h-1.5 rounded-full bg-amber-500 pulse-dot"
+              className="w-1.5 h-1.5 rounded-full bg-[#DED5EB] pulse-dot"
               style={{ animationDelay: `${i * 0.3}s` }}
             />
           ))}
