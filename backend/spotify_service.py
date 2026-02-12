@@ -115,8 +115,14 @@ async def get_audio_features(access_token: str, track_ids: list) -> dict:
     all_features = []
     for batch in batches:
         ids_str = ",".join(batch)
-        result = await _spotify_get(access_token, "/audio-features", {"ids": ids_str})
-        all_features.extend(result.get("audio_features", []))
+        try:
+            result = await _spotify_get(access_token, "/audio-features", {"ids": ids_str})
+            all_features.extend(result.get("audio_features", []))
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 403:
+                logger.warning("Audio features API restricted (403). Spotify deprecated this for newer apps.")
+                raise
+            raise
     return {"audio_features": all_features}
 
 
