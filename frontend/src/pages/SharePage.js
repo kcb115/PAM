@@ -208,7 +208,7 @@ export default function SharePage() {
           <div className="text-center">
             <Button
               onClick={() => navigate("/onboarding")}
-              className="spotify-btn px-10 py-7 text-base"
+              className="bg-[#380E75] text-[#DED5EB] font-syne font-bold uppercase tracking-wider rounded-full px-10 py-7 text-base hover:bg-[#380E75]/80 transition-all duration-200"
               data-testid="share-cta-btn"
             >
               Discover Your Taste
