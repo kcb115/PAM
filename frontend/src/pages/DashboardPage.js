@@ -303,7 +303,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
                       window.open(authUrl, '_blank');
                     }
                   }}
-                  className="spotify-btn px-8 py-6"
+                  className="bg-[#380E75] text-[#DED5EB] font-syne font-bold uppercase tracking-wider rounded-full px-8 py-6 hover:bg-[#380E75]/80 transition-all duration-200"
                   data-testid="reconnect-spotify-btn"
                 >
                   Connect Spotify
