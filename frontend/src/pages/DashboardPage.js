@@ -292,7 +292,16 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
                   onClick={async () => {
                     if (!user?.id) return;
                     const res = await api.spotifyLogin(user.id);
-                    window.location.href = res.data.auth_url;
+                    const authUrl = res.data.auth_url;
+                    try {
+                      if (window.top !== window.self) {
+                        window.top.location.href = authUrl;
+                      } else {
+                        window.location.href = authUrl;
+                      }
+                    } catch {
+                      window.open(authUrl, '_blank');
+                    }
                   }}
                   className="spotify-btn px-8 py-6"
                   data-testid="reconnect-spotify-btn"
