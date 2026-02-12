@@ -215,62 +215,75 @@ async def discover_concerts(data: DiscoverRequest):
         {"$set": {"city": data.city, "radius": data.radius}},
     )
 
-    # 1. Try Ticketmaster (real events API)
-    events_data = await ticketmaster_service.search_events(
-        city=data.city,
-        radius=data.radius,
-        date_from=data.date_from,
-        date_to=data.date_to,
-    )
-    events = events_data.get("events", [])
-    source = events_data.get("source", "ticketmaster")
-    api_error = events_data.get("error", "")
-
-    # 2. If Ticketmaster has no key, try Jambase
-    if api_error == "no_key":
-        jb_data = await jambase_service.search_events(data.city, data.radius)
-        jb_events = jb_data.get("events", [])
-        if jb_events and not jb_data.get("error"):
-            events = jb_events
-            source = "jambase"
-            api_error = ""
-
-    # 3. If no real events API, use MusicBrainz discovery
-    if not events and api_error:
-        logger.info("No events API available. Using MusicBrainz discovery.")
-        events_data = await event_discovery.discover_events_via_spotify(
-            access_token=access_token,
-            top_artist_ids=taste.top_artist_ids,
-            top_artist_names=taste.top_artist_names,
-            root_genre_map=taste.root_genre_map,
-            city=data.city,
-            radius=data.radius,
-            date_from=data.date_from,
-            date_to=data.date_to,
-        )
-        events = events_data.get("events", [])
-        source = "musicbrainz_discovery"
-
-    if not events:
-        msg = "No upcoming events found in this area."
-        if api_error == "no_key":
-            msg = ("To see real concerts, add a free Ticketmaster API key. "
-                   "Register at developer.ticketmaster.com (takes 2 min), "
-                   "then add your Consumer Key to the app settings.")
-        elif api_error:
-            msg += f" ({api_error})"
-        else:
-            msg += " Try expanding your radius or a different city."
-
+    # Step 1: Geocode the city to lat/lng
+    geo = await geocoding.geocode(data.city)
+    if not geo:
         return DiscoverResponse(
             concerts=[],
             taste_profile=taste,
             total_events_scanned=0,
-            message=msg,
+            message=f"Could not find coordinates for '{data.city}'. Try a more specific city name (e.g., 'Roanoke, VA').",
+            source="geocoding_error",
+        )
+
+    logger.info(f"Geocoded '{data.city}' to {geo['lat']}, {geo['lng']}")
+
+    # Step 2: Map user's top genres to Jambase genre slugs
+    genre_slugs = jambase_service.get_jambase_slugs_for_profile(taste.root_genre_map, max_slugs=5)
+    logger.info(f"Jambase genre slugs for user: {genre_slugs}")
+
+    # Parse date filters
+    date_from = None
+    date_to = None
+    if data.date_from:
+        try:
+            dt = datetime.fromisoformat(data.date_from.replace("Z", "+00:00"))
+            date_from = dt.strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+    if data.date_to:
+        try:
+            dt = datetime.fromisoformat(data.date_to.replace("Z", "+00:00"))
+            date_to = dt.strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+
+    # Step 3: Fetch events from Jambase (genre-filtered + all)
+    events_data = await jambase_service.search_events(
+        lat=geo["lat"],
+        lng=geo["lng"],
+        radius=data.radius,
+        genre_slugs=genre_slugs if genre_slugs else None,
+        date_from=date_from,
+        date_to=date_to,
+        max_pages=3,
+        per_page=50,
+    )
+
+    events = events_data.get("events", [])
+    source = events_data.get("source", "jambase")
+
+    # If Jambase returned nothing, try Ticketmaster as fallback
+    if not events:
+        tm_data = await ticketmaster_service.search_events(
+            city=data.city, radius=data.radius,
+            date_from=data.date_from, date_to=data.date_to,
+        )
+        tm_events = tm_data.get("events", [])
+        if tm_events:
+            events = tm_events
+            source = "ticketmaster"
+
+    if not events:
+        return DiscoverResponse(
+            concerts=[],
+            taste_profile=taste,
+            total_events_scanned=0,
+            message="No upcoming concerts found in this area. Try expanding your radius or a different city.",
             source=source,
         )
 
-    # Match and rank
+    # Step 4: Match and rank
     try:
         concerts = await matching.match_and_rank_concerts(events, taste, access_token)
     except Exception as e:
