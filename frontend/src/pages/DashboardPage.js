@@ -401,7 +401,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
                 toast.success("Copied!");
                 setTimeout(() => setCopied(false), 3000);
               }}
-              className="text-amber-400 shrink-0"
+              className="text-[#DED5EB] shrink-0"
               data-testid="copy-share-url-btn"
             >
               {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
