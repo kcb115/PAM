@@ -17,7 +17,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export const ConcertCard = ({ concert, rank }) => {
+export const ConcertCard = ({ concert, rank, onFavorite, isFavorited }) => {
   const [expanded, setExpanded] = useState(false);
 
   const {
@@ -32,6 +32,7 @@ export const ConcertCard = ({ concert, rank }) => {
     ticket_url,
     event_url,
     spotify_popularity,
+    featured_track,
   } = concert;
 
   // Format date
