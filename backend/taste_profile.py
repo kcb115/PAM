@@ -74,6 +74,60 @@ def compute_audio_features(features_list: list) -> AudioFeatures:
     )
 
 
+# Genre-based audio feature profiles for estimation when API is restricted
+GENRE_AUDIO_PROFILES = {
+    "rock": {"energy": 0.72, "danceability": 0.50, "valence": 0.55, "acousticness": 0.15, "instrumentalness": 0.05, "tempo": 128},
+    "indie": {"energy": 0.55, "danceability": 0.52, "valence": 0.48, "acousticness": 0.30, "instrumentalness": 0.08, "tempo": 120},
+    "pop": {"energy": 0.68, "danceability": 0.70, "valence": 0.65, "acousticness": 0.15, "instrumentalness": 0.02, "tempo": 120},
+    "electronic": {"energy": 0.78, "danceability": 0.75, "valence": 0.45, "acousticness": 0.05, "instrumentalness": 0.25, "tempo": 128},
+    "hip hop": {"energy": 0.65, "danceability": 0.78, "valence": 0.50, "acousticness": 0.10, "instrumentalness": 0.02, "tempo": 130},
+    "rap": {"energy": 0.68, "danceability": 0.76, "valence": 0.48, "acousticness": 0.08, "instrumentalness": 0.01, "tempo": 132},
+    "folk": {"energy": 0.35, "danceability": 0.45, "valence": 0.50, "acousticness": 0.70, "instrumentalness": 0.05, "tempo": 110},
+    "jazz": {"energy": 0.40, "danceability": 0.55, "valence": 0.55, "acousticness": 0.45, "instrumentalness": 0.20, "tempo": 115},
+    "metal": {"energy": 0.90, "danceability": 0.35, "valence": 0.30, "acousticness": 0.05, "instrumentalness": 0.10, "tempo": 140},
+    "punk": {"energy": 0.85, "danceability": 0.45, "valence": 0.50, "acousticness": 0.08, "instrumentalness": 0.02, "tempo": 155},
+    "soul": {"energy": 0.50, "danceability": 0.65, "valence": 0.60, "acousticness": 0.30, "instrumentalness": 0.03, "tempo": 110},
+    "r&b": {"energy": 0.52, "danceability": 0.68, "valence": 0.55, "acousticness": 0.25, "instrumentalness": 0.02, "tempo": 105},
+    "country": {"energy": 0.55, "danceability": 0.55, "valence": 0.65, "acousticness": 0.40, "instrumentalness": 0.02, "tempo": 120},
+    "classical": {"energy": 0.25, "danceability": 0.25, "valence": 0.35, "acousticness": 0.85, "instrumentalness": 0.80, "tempo": 100},
+    "ambient": {"energy": 0.20, "danceability": 0.30, "valence": 0.35, "acousticness": 0.60, "instrumentalness": 0.65, "tempo": 90},
+    "dance": {"energy": 0.82, "danceability": 0.82, "valence": 0.60, "acousticness": 0.05, "instrumentalness": 0.10, "tempo": 125},
+    "alternative": {"energy": 0.60, "danceability": 0.50, "valence": 0.45, "acousticness": 0.25, "instrumentalness": 0.08, "tempo": 122},
+    "blues": {"energy": 0.45, "danceability": 0.50, "valence": 0.45, "acousticness": 0.45, "instrumentalness": 0.05, "tempo": 100},
+}
+
+
+def _estimate_audio_features_from_artists(artists: list) -> AudioFeatures:
+    """Estimate audio features from artist genres when the audio-features API is restricted."""
+    totals = {"energy": 0, "danceability": 0, "valence": 0, "acousticness": 0, "instrumentalness": 0, "tempo": 0}
+    matches = 0
+
+    for artist in artists:
+        for genre in artist.get("genres", []):
+            for root in extract_root_genres(genre):
+                if root in GENRE_AUDIO_PROFILES:
+                    profile = GENRE_AUDIO_PROFILES[root]
+                    for key in totals:
+                        totals[key] += profile[key]
+                    matches += 1
+
+    if matches == 0:
+        # Fallback to balanced defaults
+        return AudioFeatures(
+            energy=0.55, danceability=0.55, valence=0.50,
+            acousticness=0.25, instrumentalness=0.05, tempo=120.0,
+        )
+
+    return AudioFeatures(
+        energy=round(totals["energy"] / matches, 3),
+        danceability=round(totals["danceability"] / matches, 3),
+        valence=round(totals["valence"] / matches, 3),
+        acousticness=round(totals["acousticness"] / matches, 3),
+        instrumentalness=round(totals["instrumentalness"] / matches, 3),
+        tempo=round(totals["tempo"] / matches, 1),
+    )
+
+
 async def build_taste_profile(user_id: str, access_token: str) -> TasteProfile:
     """Build a complete taste profile from the user's Spotify data."""
     logger.info(f"Building taste profile for user {user_id}")
