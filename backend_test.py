@@ -228,19 +228,190 @@ class PAMAPITester:
             self.log_result("Invalid User Creation", "FAIL", f"Exception: {str(e)}")
             return False
 
+    def test_add_favorite(self):
+        """Test POST /api/favorites - Add favorite concert"""
+        if not self.test_user_id:
+            self.log_result("Add Favorite", "SKIP", "No user ID available")
+            return False
+            
+        # Sample concert data matching ConcertMatch model
+        favorite_data = {
+            "user_id": self.test_user_id,
+            "concert": {
+                "event_id": "test_event_001",
+                "artist_name": "Test Artist",
+                "genre_description": "Indie Rock, Alternative",
+                "match_score": 75.5,
+                "match_explanation": "This is a test concert match",
+                "venue_name": "Test Venue",
+                "venue_city": "Austin, TX",
+                "date": "2025-02-15T20:00:00Z",
+                "time": "8:00 PM",
+                "ticket_url": "https://example.com/tickets",
+                "event_url": "https://example.com/event",
+                "spotify_popularity": 45,
+                "image_url": "https://example.com/image.jpg",
+                "featured_track": "Test Track",
+                "source": "spotify_discovery"
+            }
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/favorites",
+                json=favorite_data,
+                headers={"Content-Type": "application/json"},
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("id") and data.get("user_id") == self.test_user_id:
+                    self.test_favorite_id = data["id"]
+                    self.log_result("Add Favorite", "PASS", 
+                                  f"Favorite created successfully. ID: {self.test_favorite_id}, Concert: {data['concert']['artist_name']}")
+                    return True
+                else:
+                    self.log_result("Add Favorite", "FAIL", f"Invalid response data: {data}")
+                    return False
+            else:
+                self.log_result("Add Favorite", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+                return False
+        except Exception as e:
+            self.log_result("Add Favorite", "FAIL", f"Exception: {str(e)}")
+            return False
+
+    def test_get_favorites(self):
+        """Test GET /api/favorites/{user_id} - Get user favorites"""
+        if not self.test_user_id:
+            self.log_result("Get Favorites", "SKIP", "No user ID available")
+            return False
+            
+        try:
+            response = requests.get(f"{self.base_url}/favorites/{self.test_user_id}", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    if len(data) > 0 and self.test_favorite_id:
+                        # Check if our test favorite is in the list
+                        favorite_found = any(fav.get("id") == self.test_favorite_id for fav in data)
+                        if favorite_found:
+                            self.log_result("Get Favorites", "PASS", 
+                                          f"Favorites retrieved successfully. Count: {len(data)}, Test favorite found")
+                            return True
+                        else:
+                            self.log_result("Get Favorites", "FAIL", f"Test favorite not found in list")
+                            return False
+                    else:
+                        self.log_result("Get Favorites", "PASS", 
+                                      f"Favorites retrieved successfully (empty list or no test favorite to verify)")
+                        return True
+                else:
+                    self.log_result("Get Favorites", "FAIL", f"Expected list, got: {type(data)}")
+                    return False
+            else:
+                self.log_result("Get Favorites", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+                return False
+        except Exception as e:
+            self.log_result("Get Favorites", "FAIL", f"Exception: {str(e)}")
+            return False
+
+    def test_remove_favorite(self):
+        """Test DELETE /api/favorites/{favorite_id} - Remove favorite"""
+        if not self.test_favorite_id:
+            self.log_result("Remove Favorite", "SKIP", "No favorite ID available")
+            return False
+            
+        try:
+            response = requests.delete(f"{self.base_url}/favorites/{self.test_favorite_id}", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("deleted") == True:
+                    self.log_result("Remove Favorite", "PASS", f"Favorite deleted successfully. ID: {self.test_favorite_id}")
+                    return True
+                else:
+                    self.log_result("Remove Favorite", "FAIL", f"Unexpected response: {data}")
+                    return False
+            elif response.status_code == 404:
+                self.log_result("Remove Favorite", "FAIL", "Favorite not found (404)")
+                return False
+            else:
+                self.log_result("Remove Favorite", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+                return False
+        except Exception as e:
+            self.log_result("Remove Favorite", "FAIL", f"Exception: {str(e)}")
+            return False
+
+    def test_create_share_without_taste_profile(self):
+        """Test POST /api/share/create?user_id=xxx - Should fail without taste profile"""
+        if not self.test_user_id:
+            self.log_result("Create Share (No Profile)", "SKIP", "No user ID available")
+            return False
+            
+        try:
+            response = requests.post(
+                f"{self.base_url}/share/create",
+                params={"user_id": self.test_user_id},
+                timeout=10
+            )
+            
+            # This should fail because user doesn't have a taste profile
+            if response.status_code == 400:
+                data = response.json()
+                if "taste profile" in data.get("detail", "").lower():
+                    self.log_result("Create Share (No Profile)", "PASS", 
+                                  f"Correctly rejected share creation without taste profile: {data.get('detail')}")
+                    return True
+                else:
+                    self.log_result("Create Share (No Profile)", "FAIL", f"Wrong error message: {data}")
+                    return False
+            else:
+                self.log_result("Create Share (No Profile)", "FAIL", 
+                              f"Expected 400, got {response.status_code}. Response: {response.text}")
+                return False
+        except Exception as e:
+            self.log_result("Create Share (No Profile)", "FAIL", f"Exception: {str(e)}")
+            return False
+
+    def test_get_nonexistent_share(self):
+        """Test GET /api/share/{invalid_share_id} - Should return 404"""
+        fake_share_id = "nonexistent123"
+        try:
+            response = requests.get(f"{self.base_url}/share/{fake_share_id}", timeout=10)
+            
+            if response.status_code == 404:
+                self.log_result("Get Nonexistent Share", "PASS", "Correctly returned 404 for invalid share ID")
+                return True
+            else:
+                self.log_result("Get Nonexistent Share", "FAIL", f"Expected 404, got {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_result("Get Nonexistent Share", "FAIL", f"Exception: {str(e)}")
+            return False
+
     def run_all_tests(self):
         """Run all tests"""
-        print(f"🚀 Starting PAM API Tests")
+        print(f"🚀 Starting PAM API Tests (Updated for New Features)")
         print(f"Testing endpoint: {self.base_url}")
         print("=" * 60)
         
-        # Test order matters - create user first for other tests
+        # Test order matters - create user first, then favorites, then clean up
         tests = [
             self.test_health_check,
             self.test_create_user,
             self.test_get_user,
             self.test_update_user,
             self.test_spotify_login,
+            # New favorites endpoints
+            self.test_add_favorite,
+            self.test_get_favorites,
+            self.test_remove_favorite,
+            # New share endpoints
+            self.test_create_share_without_taste_profile,
+            self.test_get_nonexistent_share,
+            # Error handling tests
             self.test_get_nonexistent_user,
             self.test_invalid_user_creation,
         ]
