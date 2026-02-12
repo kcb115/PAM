@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Music, LogOut, RefreshCw } from "lucide-react";
+import { Music, LogOut, RefreshCw, Share2, Heart, Search, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { TasteProfileCard } from "@/components/pam/TasteProfileCard";
 import { LocationSearch } from "@/components/pam/LocationSearch";
 import { ConcertList } from "@/components/pam/ConcertList";
+import { FavoritesList } from "@/components/pam/FavoritesList";
 import { LoadingState } from "@/components/pam/LoadingState";
 import { motion } from "framer-motion";
 
@@ -15,9 +17,13 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
   const [searchParams] = useSearchParams();
   const [tasteProfile, setTasteProfile] = useState(null);
   const [concerts, setConcerts] = useState([]);
+  const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState("");
   const [message, setMessage] = useState("");
   const [totalScanned, setTotalScanned] = useState(0);
+  const [shareUrl, setShareUrl] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState("discover");
   const [sessionId, setSessionId] = useState(() =>
     localStorage.getItem("pam_session_id") || ""
   );
@@ -33,18 +39,21 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
     }
 
     if (uid && !user) {
-      // Fetch user from backend
       api.getUser(uid).then((res) => {
         onSaveUser(res.data);
       }).catch(() => {});
     }
   }, [searchParams, user, onSaveUser]);
 
-  // Try loading existing taste profile
+  // Load existing taste profile & favorites
   useEffect(() => {
     if (user?.id) {
       api.getTasteProfile(user.id).then((res) => {
         setTasteProfile(res.data);
+      }).catch(() => {});
+
+      api.getFavorites(user.id).then((res) => {
+        setFavorites(res.data || []);
       }).catch(() => {});
     }
   }, [user?.id]);
@@ -75,7 +84,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
     }
   }, [sessionId, user?.id, tasteProfile, buildTasteProfile]);
 
-  const handleDiscover = async (city, radius) => {
+  const handleDiscover = async (city, radius, dateFrom, dateTo) => {
     if (!user?.id) return;
     if (!tasteProfile) {
       toast.error("Build your taste profile first");
@@ -92,6 +101,8 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
         user_id: user.id,
         city,
         radius,
+        date_from: dateFrom,
+        date_to: dateTo,
       });
 
       setConcerts(res.data.concerts || []);
@@ -99,7 +110,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
       setTotalScanned(res.data.total_events_scanned || 0);
 
       if (res.data.concerts?.length > 0) {
-        toast.success(`Found ${res.data.concerts.length} matching concerts!`);
+        toast.success(`Found ${res.data.concerts.length} matching artists!`);
       } else if (res.data.message) {
         toast.info(res.data.message);
       }
@@ -112,10 +123,63 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
     }
   };
 
+  const handleFavorite = async (concert) => {
+    if (!user?.id) return;
+    const isSaved = favorites.some((f) => f.concert.event_id === concert.event_id);
+
+    if (isSaved) {
+      const fav = favorites.find((f) => f.concert.event_id === concert.event_id);
+      if (fav) {
+        try {
+          await api.removeFavorite(fav.id);
+          setFavorites((prev) => prev.filter((f) => f.id !== fav.id));
+          toast.success("Removed from favorites");
+        } catch (err) {
+          toast.error("Failed to remove");
+        }
+      }
+    } else {
+      try {
+        const res = await api.addFavorite({ user_id: user.id, concert });
+        setFavorites((prev) => [...prev, res.data]);
+        toast.success("Saved to favorites!");
+      } catch (err) {
+        toast.error("Failed to save");
+      }
+    }
+  };
+
+  const handleRemoveFavorite = async (favoriteId) => {
+    try {
+      await api.removeFavorite(favoriteId);
+      setFavorites((prev) => prev.filter((f) => f.id !== favoriteId));
+      toast.success("Removed from favorites");
+    } catch (err) {
+      toast.error("Failed to remove");
+    }
+  };
+
+  const handleShare = async () => {
+    if (!user?.id) return;
+    try {
+      const res = await api.createShare(user.id);
+      const url = `${window.location.origin}/share/${res.data.share_id}`;
+      setShareUrl(url);
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      toast.success("Share link copied to clipboard!");
+      setTimeout(() => setCopied(false), 3000);
+    } catch (err) {
+      toast.error("Failed to generate share link");
+    }
+  };
+
   const handleLogout = () => {
     onLogout();
     navigate("/");
   };
+
+  const favoriteEventIds = new Set(favorites.map((f) => f.concert.event_id));
 
   // If no user, redirect to onboarding
   if (!user && !searchParams.get("user_id")) {
@@ -147,7 +211,19 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
             <span className="font-syne font-extrabold text-lg tracking-tight">PAM</span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {tasteProfile && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleShare}
+                className="text-zinc-500 hover:text-amber-400 text-xs font-mono"
+                data-testid="share-btn"
+              >
+                {copied ? <Check className="w-4 h-4 mr-1" /> : <Share2 className="w-4 h-4 mr-1" />}
+                {copied ? "Copied!" : "Share"}
+              </Button>
+            )}
             {user && (
               <span className="text-xs font-mono text-zinc-500 hidden sm:block" data-testid="user-greeting">
                 {user.name}
@@ -185,19 +261,21 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
                 Taste Fingerprint
               </h2>
             </div>
-            {tasteProfile && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={buildTasteProfile}
-                disabled={!!loading}
-                className="text-zinc-500 hover:text-white"
-                data-testid="refresh-profile-btn"
-              >
-                <RefreshCw className="w-4 h-4 mr-1" />
-                Refresh
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {tasteProfile && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={buildTasteProfile}
+                  disabled={!!loading}
+                  className="text-zinc-500 hover:text-white"
+                  data-testid="refresh-profile-btn"
+                >
+                  <RefreshCw className="w-4 h-4 mr-1" />
+                  Refresh
+                </Button>
+              )}
+            </div>
           </div>
 
           {tasteProfile ? (
@@ -226,7 +304,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
           ) : null}
         </motion.div>
 
-        {/* Location Search */}
+        {/* Tabs: Discover / Favorites */}
         {tasteProfile && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -234,28 +312,91 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="mt-12"
           >
-            <LocationSearch
-              onSearch={handleDiscover}
-              loading={loading === "discover"}
-              defaultCity={user?.city || ""}
-              defaultRadius={user?.radius || 25}
-            />
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="bg-secondary/50 border border-white/5 rounded-full p-1 mb-8">
+                <TabsTrigger
+                  value="discover"
+                  className="rounded-full font-syne font-bold text-sm data-[state=active]:bg-amber-500 data-[state=active]:text-black px-6"
+                  data-testid="discover-tab"
+                >
+                  <Search className="w-4 h-4 mr-2" />
+                  Discover
+                </TabsTrigger>
+                <TabsTrigger
+                  value="favorites"
+                  className="rounded-full font-syne font-bold text-sm data-[state=active]:bg-amber-500 data-[state=active]:text-black px-6"
+                  data-testid="favorites-tab"
+                >
+                  <Heart className="w-4 h-4 mr-2" />
+                  Saved ({favorites.length})
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="discover">
+                <LocationSearch
+                  onSearch={handleDiscover}
+                  loading={loading === "discover"}
+                  defaultCity={user?.city || ""}
+                  defaultRadius={user?.radius || 25}
+                />
+
+                {(concerts.length > 0 || message) && (
+                  <div className="mt-12">
+                    <ConcertList
+                      concerts={concerts}
+                      message={message}
+                      totalScanned={totalScanned}
+                      onFavorite={handleFavorite}
+                      favoriteIds={favoriteEventIds}
+                    />
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="favorites">
+                <div className="mb-6">
+                  <p className="font-mono text-xs uppercase tracking-[0.2em] text-amber-500/80 mb-1">
+                    Your Collection
+                  </p>
+                  <h2 className="font-syne text-2xl md:text-3xl font-bold tracking-tight">
+                    Saved Concerts
+                  </h2>
+                </div>
+                <FavoritesList
+                  favorites={favorites}
+                  onRemove={handleRemoveFavorite}
+                />
+              </TabsContent>
+            </Tabs>
           </motion.div>
         )}
 
-        {/* Concert Results */}
-        {(concerts.length > 0 || message) && (
+        {/* Share URL display */}
+        {shareUrl && (
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="mt-12"
+            className="mt-8 glass-card p-4 flex items-center gap-3"
+            data-testid="share-url-display"
           >
-            <ConcertList
-              concerts={concerts}
-              message={message}
-              totalScanned={totalScanned}
-            />
+            <Share2 className="w-4 h-4 text-amber-500 shrink-0" />
+            <code className="flex-1 font-mono text-xs text-zinc-400 truncate">
+              {shareUrl}
+            </code>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                await navigator.clipboard.writeText(shareUrl);
+                setCopied(true);
+                toast.success("Copied!");
+                setTimeout(() => setCopied(false), 3000);
+              }}
+              className="text-amber-400 shrink-0"
+              data-testid="copy-share-url-btn"
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            </Button>
           </motion.div>
         )}
       </div>
