@@ -48,9 +48,9 @@ export const TasteProfileCard = ({ profile }) => {
               />
               <Radar
                 dataKey="value"
-                stroke="#f59e0b"
-                fill="#f59e0b"
-                fillOpacity={0.15}
+                stroke="#DED5EB"
+                fill="#380E75"
+                fillOpacity={0.25}
                 strokeWidth={2}
               />
             </RadarChart>
@@ -58,7 +58,7 @@ export const TasteProfileCard = ({ profile }) => {
         </div>
         <div className="mt-2 flex items-center justify-center gap-2" data-testid="tempo-display">
           <span className="font-mono text-xs text-zinc-500">AVG TEMPO</span>
-          <span className="font-mono text-sm text-amber-500 font-bold">
+          <span className="font-mono text-sm text-[#DED5EB] font-bold">
             {Math.round(tempo)} BPM
           </span>
         </div>
@@ -82,9 +82,9 @@ export const TasteProfileCard = ({ profile }) => {
                     "--score-width": `${Math.round(weight * 100)}%`,
                     width: `${Math.round(weight * 100)}%`,
                     background: weight > 0.6
-                      ? "#f59e0b"
+                      ? "#DED5EB"
                       : weight > 0.3
-                      ? "#14b8a6"
+                      ? "#380E75"
                       : "#3f3f46",
                   }}
                 />
@@ -109,9 +109,9 @@ export const TasteProfileCard = ({ profile }) => {
               variant="secondary"
               className={`text-xs font-mono border transition-colors duration-200 cursor-default ${
                 weight > 0.7
-                  ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                  ? "border-[#DED5EB]/30 bg-[#380E75]/20 text-[#DED5EB]"
                   : weight > 0.4
-                  ? "border-teal-500/20 bg-teal-500/5 text-teal-400"
+                  ? "border-[#380E75]/30 bg-[#380E75]/10 text-[#DED5EB]/70"
                   : "border-white/10 bg-white/5 text-zinc-400"
               }`}
             >
