@@ -12,6 +12,7 @@ import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict
 import spotify_service
+import musicbrainz_service
 
 logger = logging.getLogger(__name__)
 
