@@ -57,7 +57,7 @@ export default function LandingPage({ user }) {
             variants={fadeUp}
             initial="hidden"
             animate="visible"
-            className="font-mono text-xs uppercase tracking-[0.2em] text-amber-500/80 mb-6"
+            className="font-mono text-xs uppercase tracking-[0.2em] text-[#DED5EB]/80 mb-6"
             data-testid="hero-subtitle"
           >
             Concert Discovery Engine
