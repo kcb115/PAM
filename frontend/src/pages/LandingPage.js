@@ -97,7 +97,7 @@ export default function LandingPage({ user }) {
           >
             <Button
               onClick={handleStart}
-              className="spotify-btn px-10 py-7 text-base"
+              className="bg-[#380E75] text-[#DED5EB] font-syne font-bold uppercase tracking-wider rounded-full px-10 py-7 text-base hover:bg-[#380E75]/80 transition-all duration-200 hover:shadow-[0_0_25px_rgba(56,14,117,0.4)]"
               data-testid="get-started-btn"
             >
               <Sparkles className="w-5 h-5 mr-2" />
