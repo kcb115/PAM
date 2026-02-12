@@ -29,4 +29,8 @@ export const api = {
   // Share
   createShare: (userId) => axios.post(`${API}/share/create?user_id=${userId}`),
   getShare: (shareId) => axios.get(`${API}/share/${shareId}`),
+
+  // Settings
+  getEventsApiStatus: () => axios.get(`${API}/settings/events-api-status`),
+  setTicketmasterKey: (key) => axios.post(`${API}/settings/ticketmaster-key?key=${encodeURIComponent(key)}`),
 };
