@@ -187,7 +187,7 @@ export default function OnboardingPage({ onSaveUser }) {
                 transition={{ duration: 0.3 }}
               >
                 <div className="mb-8">
-                  <p className="font-mono text-xs uppercase tracking-[0.2em] text-amber-500/80 mb-3">
+                  <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#DED5EB]/80 mb-3">
                     Step 2 of 2
                   </p>
                   <h2 className="font-syne text-3xl md:text-4xl font-bold tracking-tight mb-2">
