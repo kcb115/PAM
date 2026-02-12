@@ -333,7 +333,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
                 </TabsTrigger>
                 <TabsTrigger
                   value="favorites"
-                  className="rounded-full font-syne font-bold text-sm data-[state=active]:bg-amber-500 data-[state=active]:text-black px-6"
+                  className="rounded-full font-syne font-bold text-sm data-[state=active]:bg-[#380E75] data-[state=active]:text-[#DED5EB] px-6"
                   data-testid="favorites-tab"
                 >
                   <Heart className="w-4 h-4 mr-2" />
