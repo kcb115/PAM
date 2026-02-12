@@ -161,121 +161,79 @@ async def discover_events_via_spotify(
     date_to: str = None,
 ) -> dict:
     """
-    Use Spotify's recommendations to find artists similar to the user's taste,
-    then generate event listings for those artists.
+    Discover similar artists using MusicBrainz (since Spotify recommendations
+    were deprecated in Nov 2024), then generate event listings.
     """
-    logger.info(f"Discovering events via Spotify recommendations for {city}")
+    logger.info(f"Discovering events via MusicBrainz for {city}")
 
-    # Pick seed artists (max 5 for Spotify recommendations)
-    seed_artists = top_artist_ids[:5] if top_artist_ids else []
-    if not seed_artists:
-        return {"events": [], "total": 0, "source": "spotify_recommendations"}
+    if not root_genre_map and not top_artist_names:
+        return {"events": [], "total": 0, "source": "musicbrainz_discovery"}
 
-    # Get recommendations
-    discovered_artists = {}
     known_names_lower = {n.lower() for n in top_artist_names}
 
-    try:
-        # Get recommended tracks, extract unique artists
-        recs = await spotify_service._spotify_get(access_token, "/recommendations", {
-            "seed_artists": ",".join(seed_artists[:5]),
-            "limit": 50,
-            "min_popularity": 5,
-            "max_popularity": 55,
-        })
+    # Use top root genres to find similar artists via MusicBrainz
+    top_tags = sorted(root_genre_map.items(), key=lambda x: x[1], reverse=True)[:6]
+    tag_names = [t[0] for t in top_tags]
 
-        for track in recs.get("tracks", []):
-            for artist in track.get("artists", []):
-                aid = artist.get("id", "")
-                aname = artist.get("name", "")
-                if aname.lower() not in known_names_lower and aid not in top_artist_ids:
-                    if aid not in discovered_artists:
-                        discovered_artists[aid] = {
-                            "id": aid,
-                            "name": aname,
-                            "track_name": track.get("name", ""),
-                        }
-    except Exception as e:
-        logger.warning(f"Spotify recommendations failed: {e}")
+    discovered = await musicbrainz_service.find_artists_by_tags(
+        tags=tag_names,
+        exclude_names=set(top_artist_names),
+        limit=30,
+    )
 
-    # Also try with genre seeds
-    top_genres = sorted(root_genre_map.items(), key=lambda x: x[1], reverse=True)[:3]
-    genre_seeds = [g[0].replace(" ", "-") for g in top_genres]
+    if not discovered:
+        return {"events": [], "total": 0, "source": "musicbrainz_discovery"}
 
-    if genre_seeds and len(discovered_artists) < 20:
-        try:
-            recs2 = await spotify_service._spotify_get(access_token, "/recommendations", {
-                "seed_genres": ",".join(genre_seeds[:3]),
-                "seed_artists": ",".join(seed_artists[:2]),
-                "limit": 30,
-                "min_popularity": 3,
-                "max_popularity": 50,
-            })
-            for track in recs2.get("tracks", []):
-                for artist in track.get("artists", []):
-                    aid = artist.get("id", "")
-                    aname = artist.get("name", "")
-                    if aname.lower() not in known_names_lower and aid not in top_artist_ids:
-                        if aid not in discovered_artists:
-                            discovered_artists[aid] = {
-                                "id": aid,
-                                "name": aname,
-                                "track_name": track.get("name", ""),
-                            }
-        except Exception as e:
-            logger.warning(f"Genre-based recommendations failed: {e}")
-
-    if not discovered_artists:
-        return {"events": [], "total": 0, "source": "spotify_recommendations"}
-
-    # Fetch full artist details for discovered artists
-    artist_ids = list(discovered_artists.keys())[:30]
     venues = _get_venues_for_city(city)
-    dates = _generate_event_dates(len(artist_ids), date_from, date_to)
+    dates = _generate_event_dates(len(discovered), date_from, date_to)
 
     events = []
-    for i, aid in enumerate(artist_ids):
-        ainfo = discovered_artists[aid]
+    for i, artist in enumerate(discovered):
+        name = artist["name"]
+        tags = artist.get("tags", [])
 
-        # Get artist details from Spotify
+        # Try to get Spotify artist info for image/popularity
+        image_url = ""
+        popularity = None
+        spotify_url = ""
         try:
-            artist_data = await spotify_service._spotify_get(access_token, f"/artists/{aid}")
-            genres = artist_data.get("genres", [])
-            popularity = artist_data.get("popularity", 0)
-            images = artist_data.get("images", [])
-            image_url = images[0]["url"] if images else ""
+            search_result = await spotify_service.search_artist(access_token, name)
+            sp_artists = search_result.get("artists", {}).get("items", [])
+            if sp_artists:
+                sp = sp_artists[0]
+                popularity = sp.get("popularity")
+                images = sp.get("images", [])
+                image_url = images[0]["url"] if images else ""
+                spotify_url = sp.get("external_urls", {}).get("spotify", "")
+                # Merge Spotify genres if available
+                sp_genres = sp.get("genres", [])
+                if sp_genres:
+                    tags = list(set(tags + sp_genres))
         except Exception:
-            genres = []
-            popularity = None
-            image_url = ""
+            pass
 
         venue = venues[i % len(venues)]
         date_str = dates[i] if i < len(dates) else dates[-1]
 
-        # Generate a deterministic event ID
-        eid = hashlib.md5(f"{aid}:{city}:{date_str}".encode()).hexdigest()[:12]
-
-        # Build Spotify artist URL as ticket placeholder
-        spotify_url = f"https://open.spotify.com/artist/{aid}"
+        eid = hashlib.md5(f"{name}:{city}:{date_str}".encode()).hexdigest()[:12]
 
         events.append({
             "event_id": eid,
-            "artist_names": [ainfo["name"]],
-            "artist_id": aid,
-            "genres": genres,
+            "artist_names": [name],
+            "genres": tags,
             "popularity": popularity,
             "venue_name": venue["name"],
             "venue_city": city,
             "date": date_str,
-            "ticket_url": spotify_url,
+            "ticket_url": spotify_url or f"https://www.google.com/search?q={name.replace(' ', '+')}+concert+tickets",
             "event_url": spotify_url,
             "image_url": image_url,
-            "featured_track": ainfo.get("track_name", ""),
-            "source": "spotify_discovery",
+            "featured_track": "",
+            "source": "musicbrainz_discovery",
         })
 
     return {
         "events": events,
         "total": len(events),
-        "source": "spotify_recommendations",
+        "source": "musicbrainz_discovery",
     }
