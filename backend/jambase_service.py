@@ -174,7 +174,8 @@ async def search_events(
 ) -> dict:
     """
     Search for upcoming concerts near coordinates.
-    If genre_slugs provided, makes separate calls per genre and deduplicates.
+    Always fetches ALL events first. If genre_slugs provided,
+    also makes genre-filtered calls and merges/deduplicates.
     """
     api_key = os.environ.get("JAMBASE_API_KEY", "")
     if not api_key:
@@ -185,8 +186,11 @@ async def search_events(
 
     all_events = {}  # keyed by event_id to deduplicate
 
-    # If genre slugs provided, query per genre for better relevance
-    slugs_to_query = genre_slugs if genre_slugs else [None]
+    # Always fetch unfiltered events first (broad pool)
+    slugs_to_query = [None]
+    # Add genre-specific queries for higher relevance
+    if genre_slugs:
+        slugs_to_query.extend(genre_slugs)
 
     for slug in slugs_to_query:
         cache_key = f"{lat:.2f}:{lng:.2f}:{radius}:{slug or 'all'}:{date_from}"
@@ -206,7 +210,7 @@ async def search_events(
                 logger.error(f"Jambase fetch failed (slug={slug}, page={page}): {e}")
                 break
 
-            if not data.get("success", data.get("events")):
+            if not data.get("success"):
                 break
 
             raw_events = data.get("events", [])
@@ -227,6 +231,7 @@ async def search_events(
         _event_cache[cache_key] = slug_events
 
     events_list = list(all_events.values())
+    logger.info(f"Jambase returned {len(events_list)} events for {lat},{lng} r={radius}")
     return {
         "events": events_list,
         "total": len(events_list),
