@@ -189,7 +189,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
           <p className="text-zinc-400 mb-4">No profile found.</p>
           <Button
             onClick={() => navigate("/onboarding")}
-            className="bg-amber-500 text-black font-syne font-bold rounded-full px-8 py-6"
+            className="bg-[#380E75] text-[#DED5EB] font-syne font-bold rounded-full px-8 py-6"
             data-testid="go-onboarding-btn"
           >
             Get Started
