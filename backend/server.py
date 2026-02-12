@@ -20,6 +20,7 @@ import jambase_service
 import matching
 import event_discovery
 import ticketmaster_service
+import geocoding
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
