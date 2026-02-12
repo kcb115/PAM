@@ -205,8 +205,8 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
       <nav className="sticky top-0 z-50 bg-black/60 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 md:px-8 flex items-center justify-between h-16">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center">
-              <Music className="w-4 h-4 text-black" />
+            <div className="w-8 h-8 rounded-lg bg-[#380E75] flex items-center justify-center">
+              <Music className="w-4 h-4 text-[#DED5EB]" />
             </div>
             <span className="font-syne font-extrabold text-lg tracking-tight">PAM</span>
           </div>
