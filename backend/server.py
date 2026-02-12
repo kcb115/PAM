@@ -194,14 +194,12 @@ async def get_taste_profile(user_id: str):
 @api_router.post("/concerts/discover")
 async def discover_concerts(data: DiscoverRequest):
     """Discover matching concerts near the user's location."""
-    # Get taste profile
     profile_doc = await db.taste_profiles.find_one({"user_id": data.user_id}, {"_id": 0})
     if not profile_doc:
         raise HTTPException(status_code=400, detail="Build your taste profile first")
 
     taste = TasteProfile(**profile_doc)
 
-    # Get Spotify session for API calls
     session = await db.spotify_sessions.find_one({"user_id": data.user_id}, {"_id": 0})
     if not session:
         raise HTTPException(status_code=401, detail="Spotify session expired. Reconnect.")
@@ -214,25 +212,34 @@ async def discover_concerts(data: DiscoverRequest):
         {"$set": {"city": data.city, "radius": data.radius}},
     )
 
-    # Search Jambase events
+    # Try Jambase first, fall back to Spotify-based discovery
     events_data = await jambase_service.search_events(data.city, data.radius)
-
-    if events_data.get("error"):
-        return DiscoverResponse(
-            concerts=[],
-            taste_profile=taste,
-            total_events_scanned=0,
-            message=f"Event search issue: {events_data['error']}",
-        )
-
     events = events_data.get("events", [])
+    source = "jambase"
+
+    if not events or events_data.get("error"):
+        # Use Spotify-based smart discovery
+        logger.info("Falling back to Spotify-based event discovery")
+        events_data = await event_discovery.discover_events_via_spotify(
+            access_token=access_token,
+            top_artist_ids=taste.top_artist_ids,
+            top_artist_names=taste.top_artist_names,
+            root_genre_map=taste.root_genre_map,
+            city=data.city,
+            radius=data.radius,
+            date_from=data.date_from,
+            date_to=data.date_to,
+        )
+        events = events_data.get("events", [])
+        source = "spotify_discovery"
 
     if not events:
         return DiscoverResponse(
             concerts=[],
             taste_profile=taste,
             total_events_scanned=0,
-            message="No upcoming events found in this area. Try expanding your search radius.",
+            message="No upcoming events found. Try a different city or expand your search.",
+            source=source,
         )
 
     # Match and rank
@@ -244,14 +251,100 @@ async def discover_concerts(data: DiscoverRequest):
 
     message = ""
     if not concerts:
-        message = "No matching concerts found. Try expanding your radius or check back later for new events."
+        message = "No matching concerts found. Try expanding your radius or a different city."
 
     return DiscoverResponse(
         concerts=concerts,
         taste_profile=taste,
         total_events_scanned=len(events),
         message=message,
+        source=source,
     )
+
+
+# ─── Favorites ───────────────────────────────────────────
+@api_router.post("/favorites")
+async def add_favorite(data: FavoriteCreate):
+    """Save a concert to favorites."""
+    # Check for duplicate
+    existing = await db.favorites.find_one({
+        "user_id": data.user_id,
+        "concert.event_id": data.concert.event_id,
+    }, {"_id": 0})
+    if existing:
+        return {k: v for k, v in existing.items() if k != "_id"}
+
+    fav = Favorite(user_id=data.user_id, concert=data.concert)
+    doc = fav.model_dump()
+    await db.favorites.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+
+@api_router.get("/favorites/{user_id}")
+async def get_favorites(user_id: str):
+    """Get all saved favorites for a user."""
+    favs = await db.favorites.find({"user_id": user_id}, {"_id": 0}).to_list(200)
+    return favs
+
+
+@api_router.delete("/favorites/{favorite_id}")
+async def remove_favorite(favorite_id: str):
+    """Remove a concert from favorites."""
+    result = await db.favorites.delete_one({"id": favorite_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Favorite not found")
+    return {"deleted": True}
+
+
+# ─── Share Taste Profile ─────────────────────────────────
+@api_router.post("/share/create")
+async def create_share(user_id: str = Query(...)):
+    """Generate a shareable taste profile link."""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    profile = await db.taste_profiles.find_one({"user_id": user_id}, {"_id": 0})
+    if not profile:
+        raise HTTPException(status_code=400, detail="No taste profile to share")
+
+    # Create or update share
+    share_id = uuid.uuid4().hex[:10]
+
+    top_genres = sorted(
+        profile.get("genre_map", {}).items(),
+        key=lambda x: x[1],
+        reverse=True,
+    )[:8]
+
+    share_doc = {
+        "share_id": share_id,
+        "user_id": user_id,
+        "user_name": user.get("name", "Anonymous"),
+        "top_genres": [g[0] for g in top_genres],
+        "root_genre_map": profile.get("root_genre_map", {}),
+        "audio_features": profile.get("audio_features", {}),
+        "top_artist_count": len(profile.get("top_artist_ids", [])),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    # Upsert
+    await db.shares.update_one(
+        {"user_id": user_id},
+        {"$set": share_doc},
+        upsert=True,
+    )
+
+    return share_doc
+
+
+@api_router.get("/share/{share_id}")
+async def get_share(share_id: str):
+    """Get a shared taste profile by share_id."""
+    share = await db.shares.find_one({"share_id": share_id}, {"_id": 0})
+    if not share:
+        raise HTTPException(status_code=404, detail="Share not found")
+    return share
 
 
 # ─── Include router ─────────────────────────────────────
