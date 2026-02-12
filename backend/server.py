@@ -379,11 +379,9 @@ async def get_share(share_id: str):
 async def events_api_status():
     """Check if an events API key is configured."""
     tm_key = os.environ.get("TICKETMASTER_API_KEY", "")
-    jb_key = os.environ.get("JAMBASE_API_KEY", "")
     return {
         "ticketmaster_configured": bool(tm_key),
-        "jambase_configured": bool(jb_key),
-        "has_events_api": bool(tm_key or jb_key),
+        "has_events_api": bool(tm_key),
     }
 
 
