@@ -7,7 +7,7 @@ Rate limit: ~1 req/sec. We batch and respect this.
 import logging
 import asyncio
 import httpx
-from typing import List, Dict, Optional
+from typing import List, Dict
 from cachetools import TTLCache
 
 logger = logging.getLogger(__name__)
@@ -19,26 +19,38 @@ HEADERS = {"User-Agent": "PAM/1.0 (pam-concert-discovery)"}
 _artist_cache = TTLCache(maxsize=500, ttl=3600)
 _genre_artists_cache = TTLCache(maxsize=100, ttl=3600)
 
+# Shared client for connection reuse
+_client = None
 
-async def _mb_get(endpoint: str, params: dict) -> dict:
-    params["fmt"] = "json"
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{MB_API}{endpoint}",
-            params=params,
+
+async def _get_client():
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(
             headers=HEADERS,
-            timeout=10.0,
+            timeout=httpx.Timeout(15.0, connect=10.0),
         )
-        if resp.status_code == 503:
-            await asyncio.sleep(2)
-            resp = await client.get(
-                f"{MB_API}{endpoint}",
-                params=params,
-                headers=HEADERS,
-                timeout=10.0,
-            )
-        resp.raise_for_status()
-        return resp.json()
+    return _client
+
+
+async def _mb_get(endpoint: str, params: dict, retries: int = 2) -> dict:
+    params["fmt"] = "json"
+    client = await _get_client()
+
+    for attempt in range(retries + 1):
+        try:
+            resp = await client.get(f"{MB_API}{endpoint}", params=params)
+            if resp.status_code == 503:
+                await asyncio.sleep(2 + attempt)
+                continue
+            resp.raise_for_status()
+            return resp.json()
+        except (httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout) as e:
+            if attempt < retries:
+                await asyncio.sleep(1.5 + attempt)
+                continue
+            raise
+    return {}
 
 
 async def get_artist_tags(artist_name: str) -> List[str]:
@@ -48,21 +60,25 @@ async def get_artist_tags(artist_name: str) -> List[str]:
         return _artist_cache[cache_key]
 
     try:
-        data = await _mb_get("/artist/", {"query": f'artist:"{artist_name}"', "limit": "1"})
+        data = await _mb_get("/artist/", {
+            "query": f'artist:"{artist_name}"',
+            "limit": "1",
+        })
         artists = data.get("artists", [])
         if not artists:
             _artist_cache[cache_key] = []
             return []
 
         best = artists[0]
-        # Only accept high-confidence matches
-        if best.get("score", 0) < 80:
+        if best.get("score", 0) < 75:
             _artist_cache[cache_key] = []
             return []
 
-        tags = [t["name"] for t in best.get("tags", []) if t.get("count", 0) >= 0]
+        raw_tags = best.get("tags", [])
+        # Filter to tags with positive count, or take first 8
+        tags = [t["name"] for t in raw_tags if t.get("count", 0) >= 0]
         if not tags:
-            tags = [t["name"] for t in best.get("tags", [])][:5]
+            tags = [t["name"] for t in raw_tags][:8]
 
         _artist_cache[cache_key] = tags
         return tags
@@ -73,27 +89,20 @@ async def get_artist_tags(artist_name: str) -> List[str]:
         return []
 
 
-async def get_genres_for_artists(artist_names: List[str], max_concurrent: int = 3) -> Dict[str, List[str]]:
+async def get_genres_for_artists(artist_names: List[str]) -> Dict[str, List[str]]:
     """
     Look up genres for multiple artists with rate limiting.
     Returns {artist_name: [genre_tags]}.
     """
     results = {}
-    # Process in small batches to respect rate limits
-    for i in range(0, len(artist_names), max_concurrent):
-        batch = artist_names[i:i + max_concurrent]
-        tasks = [get_artist_tags(name) for name in batch]
-        batch_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        for name, tags in zip(batch, batch_results):
-            if isinstance(tags, Exception):
-                results[name] = []
-            else:
-                results[name] = tags
+    for i, name in enumerate(artist_names):
+        tags = await get_artist_tags(name)
+        results[name] = tags
 
-        # Rate limit: ~1 request per second
-        if i + max_concurrent < len(artist_names):
-            await asyncio.sleep(1.2)
+        # Rate limit: wait between requests (MusicBrainz allows ~1/sec)
+        if i < len(artist_names) - 1:
+            await asyncio.sleep(1.1)
 
     return results
 
@@ -106,8 +115,7 @@ async def find_artists_by_tags(tags: List[str], exclude_names: set, limit: int =
     discovered = []
     exclude_lower = {n.lower() for n in exclude_names}
 
-    # Search with top tags
-    for tag in tags[:5]:
+    for tag in tags[:6]:
         cache_key = f"tag:{tag}"
         if cache_key in _genre_artists_cache:
             artists = _genre_artists_cache[cache_key]
@@ -115,20 +123,20 @@ async def find_artists_by_tags(tags: List[str], exclude_names: set, limit: int =
             try:
                 data = await _mb_get("/artist/", {
                     "query": f'tag:"{tag}"',
-                    "limit": "20",
+                    "limit": "25",
                 })
                 artists = data.get("artists", [])
                 _genre_artists_cache[cache_key] = artists
             except Exception as e:
                 logger.warning(f"MusicBrainz tag search failed for '{tag}': {e}")
                 artists = []
-            await asyncio.sleep(1.2)
+            await asyncio.sleep(1.1)
 
         for artist in artists:
             name = artist.get("name", "")
             if not name or name.lower() in exclude_lower:
                 continue
-            if name.lower() == "various artists":
+            if name.lower() in ("various artists", "[unknown]", "unknown"):
                 continue
 
             artist_tags = [t["name"] for t in artist.get("tags", []) if t.get("count", 0) >= 0]
