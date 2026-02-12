@@ -442,6 +442,8 @@ class PAMAPITester:
             # New share endpoints
             self.test_create_share_without_taste_profile,
             self.test_get_nonexistent_share,
+            # MusicBrainz integration test
+            self.test_musicbrainz_integration_indirectly,
             # Error handling tests
             self.test_get_nonexistent_user,
             self.test_invalid_user_creation,
