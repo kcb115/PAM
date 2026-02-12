@@ -51,9 +51,18 @@ export default function OnboardingPage({ onSaveUser }) {
       onSaveUser(user);
       toast.success("Profile created! Let's connect your Spotify.");
 
-      // Initiate Spotify login
+      // Initiate Spotify login - use top-level navigation to escape iframe
       const spotifyRes = await api.spotifyLogin(user.id);
-      window.location.href = spotifyRes.data.auth_url;
+      const authUrl = spotifyRes.data.auth_url;
+      try {
+        if (window.top !== window.self) {
+          window.top.location.href = authUrl;
+        } else {
+          window.location.href = authUrl;
+        }
+      } catch {
+        window.open(authUrl, '_blank');
+      }
     } catch (err) {
       console.error(err);
       toast.error("Something went wrong. Please try again.");
