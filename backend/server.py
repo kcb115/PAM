@@ -374,6 +374,34 @@ async def get_share(share_id: str):
     return share
 
 
+# ─── Settings ────────────────────────────────────────────
+@api_router.get("/settings/events-api-status")
+async def events_api_status():
+    """Check if an events API key is configured."""
+    tm_key = os.environ.get("TICKETMASTER_API_KEY", "")
+    jb_key = os.environ.get("JAMBASE_API_KEY", "")
+    return {
+        "ticketmaster_configured": bool(tm_key),
+        "jambase_configured": bool(jb_key),
+        "has_events_api": bool(tm_key or jb_key),
+    }
+
+
+@api_router.post("/settings/ticketmaster-key")
+async def set_ticketmaster_key(key: str = Query(...)):
+    """Set the Ticketmaster API key at runtime."""
+    os.environ["TICKETMASTER_API_KEY"] = key
+    # Quick validation
+    try:
+        result = await ticketmaster_service.search_events("New York", radius=10, size=1)
+        if result.get("error") in ("invalid_key",):
+            os.environ["TICKETMASTER_API_KEY"] = ""
+            return {"success": False, "message": "Invalid API key. Please check and try again."}
+        return {"success": True, "message": "Ticketmaster API key configured successfully!"}
+    except Exception as e:
+        return {"success": False, "message": f"Error validating key: {str(e)}"}
+
+
 # ─── Include router ─────────────────────────────────────
 app.include_router(api_router)
 
