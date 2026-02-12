@@ -254,7 +254,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
         >
           <div className="flex items-center justify-between mb-6">
             <div>
-              <p className="font-mono text-xs uppercase tracking-[0.2em] text-amber-500/80 mb-1">
+              <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#DED5EB]/80 mb-1">
                 Your Sound
               </p>
               <h2 className="font-syne text-2xl md:text-3xl font-bold tracking-tight">
