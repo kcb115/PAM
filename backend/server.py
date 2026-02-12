@@ -8,6 +8,7 @@ import logging
 import uuid
 from pathlib import Path
 from typing import Optional, List
+from datetime import datetime, timezone
 
 from models import (
     User, UserCreate, UserUpdate, TasteProfile,
