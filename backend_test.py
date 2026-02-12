@@ -273,7 +273,7 @@ def main():
             },
             "test_results": tester.test_results,
             "test_user_id": tester.test_user_id
-        }, indent=2)
+        }, f, indent=2)
     
     return 0 if success else 1
 
