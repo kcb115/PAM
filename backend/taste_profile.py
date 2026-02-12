@@ -7,6 +7,7 @@ import logging
 from collections import defaultdict
 from models import TasteProfile, AudioFeatures
 import spotify_service
+import musicbrainz_service
 
 logger = logging.getLogger(__name__)
 
