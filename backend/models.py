@@ -69,12 +69,16 @@ class ConcertMatch(BaseModel):
     event_url: Optional[str] = None
     spotify_popularity: Optional[int] = None
     image_url: Optional[str] = None
+    featured_track: Optional[str] = None
+    source: str = "discovery"
 
 
 class DiscoverRequest(BaseModel):
     user_id: str
     city: str
     radius: int = 25
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
 
 
 class DiscoverResponse(BaseModel):
@@ -82,3 +86,27 @@ class DiscoverResponse(BaseModel):
     taste_profile: Optional[TasteProfile] = None
     total_events_scanned: int = 0
     message: str = ""
+    source: str = "spotify_discovery"
+
+
+class FavoriteCreate(BaseModel):
+    user_id: str
+    concert: ConcertMatch
+
+
+class Favorite(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    concert: ConcertMatch
+    saved_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class ShareProfile(BaseModel):
+    share_id: str
+    user_name: str
+    top_genres: List[str] = []
+    root_genre_map: Dict[str, float] = {}
+    audio_features: AudioFeatures = Field(default_factory=AudioFeatures)
+    top_artist_count: int = 0
+    created_at: str = ""
