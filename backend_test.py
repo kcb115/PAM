@@ -487,6 +487,7 @@ class PAMAPITester:
         # Test order matters - create user first, then favorites, then clean up
         tests = [
             self.test_health_check,
+            self.test_events_api_status,  # Test the key endpoint from requirements
             self.test_create_user,
             self.test_get_user,
             self.test_update_user,
@@ -498,6 +499,8 @@ class PAMAPITester:
             # New share endpoints
             self.test_create_share_without_taste_profile,
             self.test_get_nonexistent_share,
+            # Ticketmaster key setting
+            self.test_set_ticketmaster_key_invalid,
             # MusicBrainz integration test
             self.test_musicbrainz_integration_indirectly,
             # Error handling tests
