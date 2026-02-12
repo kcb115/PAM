@@ -214,14 +214,29 @@ async def discover_concerts(data: DiscoverRequest):
         {"$set": {"city": data.city, "radius": data.radius}},
     )
 
-    # Try Jambase first, fall back to Spotify-based discovery
-    events_data = await jambase_service.search_events(data.city, data.radius)
+    # 1. Try Ticketmaster (real events API)
+    events_data = await ticketmaster_service.search_events(
+        city=data.city,
+        radius=data.radius,
+        date_from=data.date_from,
+        date_to=data.date_to,
+    )
     events = events_data.get("events", [])
-    source = "jambase"
+    source = events_data.get("source", "ticketmaster")
+    api_error = events_data.get("error", "")
 
-    if not events or events_data.get("error"):
-        # Use Spotify-based smart discovery
-        logger.info("Falling back to Spotify-based event discovery")
+    # 2. If Ticketmaster has no key, try Jambase
+    if api_error == "no_key":
+        jb_data = await jambase_service.search_events(data.city, data.radius)
+        jb_events = jb_data.get("events", [])
+        if jb_events and not jb_data.get("error"):
+            events = jb_events
+            source = "jambase"
+            api_error = ""
+
+    # 3. If no real events API, use MusicBrainz discovery
+    if not events and api_error:
+        logger.info("No events API available. Using MusicBrainz discovery.")
         events_data = await event_discovery.discover_events_via_spotify(
             access_token=access_token,
             top_artist_ids=taste.top_artist_ids,
@@ -233,14 +248,24 @@ async def discover_concerts(data: DiscoverRequest):
             date_to=data.date_to,
         )
         events = events_data.get("events", [])
-        source = "spotify_discovery"
+        source = "musicbrainz_discovery"
 
     if not events:
+        msg = "No upcoming events found in this area."
+        if api_error == "no_key":
+            msg = ("To see real concerts, add a free Ticketmaster API key. "
+                   "Register at developer.ticketmaster.com (takes 2 min), "
+                   "then add your Consumer Key to the app settings.")
+        elif api_error:
+            msg += f" ({api_error})"
+        else:
+            msg += " Try expanding your radius or a different city."
+
         return DiscoverResponse(
             concerts=[],
             taste_profile=taste,
             total_events_scanned=0,
-            message="No upcoming events found. Try a different city or expand your search.",
+            message=msg,
             source=source,
         )
 
@@ -253,7 +278,7 @@ async def discover_concerts(data: DiscoverRequest):
 
     message = ""
     if not concerts:
-        message = "No matching concerts found. Try expanding your radius or a different city."
+        message = "Found events but none matched your taste profile. Try expanding your radius."
 
     return DiscoverResponse(
         concerts=concerts,
