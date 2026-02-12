@@ -217,7 +217,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
                 variant="ghost"
                 size="sm"
                 onClick={handleShare}
-                className="text-zinc-500 hover:text-amber-400 text-xs font-mono"
+                className="text-zinc-500 hover:text-[#DED5EB] text-xs font-mono"
                 data-testid="share-btn"
               >
                 {copied ? <Check className="w-4 h-4 mr-1" /> : <Share2 className="w-4 h-4 mr-1" />}
