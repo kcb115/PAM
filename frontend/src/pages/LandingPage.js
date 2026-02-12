@@ -26,8 +26,8 @@ export default function LandingPage({ user }) {
   return (
     <div className="hero-gradient min-h-screen relative overflow-hidden" data-testid="landing-page">
       {/* Ambient light spots */}
-      <div className="absolute top-0 left-[20%] w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 right-[10%] w-[400px] h-[400px] bg-teal-500/4 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-0 left-[20%] w-[500px] h-[500px] bg-[#380E75]/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-0 right-[10%] w-[400px] h-[400px] bg-[#DED5EB]/4 rounded-full blur-[100px] pointer-events-none" />
 
       {/* Nav */}
       <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6">
