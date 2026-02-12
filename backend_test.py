@@ -17,6 +17,7 @@ class PAMAPITester:
         self.tests_run = 0
         self.tests_passed = 0
         self.test_user_id = None
+        self.test_favorite_id = None
         self.test_results = []
 
     def log_result(self, test_name, status, message="", response_data=None):
