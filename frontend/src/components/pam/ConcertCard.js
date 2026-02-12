@@ -54,14 +54,14 @@ export const ConcertCard = ({ concert, rank, onFavorite, isFavorited }) => {
 
   // Score color
   const getScoreColor = (score) => {
-    if (score >= 70) return "text-amber-400";
-    if (score >= 45) return "text-teal-400";
+    if (score >= 70) return "text-[#DED5EB]";
+    if (score >= 45) return "text-[#DED5EB]/70";
     return "text-zinc-400";
   };
 
   const getBarColor = (score) => {
-    if (score >= 70) return "#f59e0b";
-    if (score >= 45) return "#14b8a6";
+    if (score >= 70) return "#DED5EB";
+    if (score >= 45) return "#380E75";
     return "#52525b";
   };
 
@@ -94,7 +94,7 @@ export const ConcertCard = ({ concert, rank, onFavorite, isFavorited }) => {
                 {isIndie && (
                   <Badge
                     variant="outline"
-                    className="text-[10px] font-mono border-amber-500/30 text-amber-400 shrink-0"
+                    className="text-[10px] font-mono border-[#380E75]/50 text-[#DED5EB] shrink-0"
                   >
                     INDIE
                   </Badge>
@@ -146,12 +146,12 @@ export const ConcertCard = ({ concert, rank, onFavorite, isFavorited }) => {
           {/* Meta row */}
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-zinc-400">
             <span className="flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-teal-500" />
+              <MapPin className="w-3.5 h-3.5 text-[#380E75]" />
               {venue_name}
               {venue_city && `, ${venue_city}`}
             </span>
             <span className="flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-amber-500" />
+              <Calendar className="w-3.5 h-3.5 text-[#DED5EB]" />
               {formatDate(date)}
               {time && ` at ${time}`}
             </span>
@@ -171,8 +171,8 @@ export const ConcertCard = ({ concert, rank, onFavorite, isFavorited }) => {
                 onClick={() => onFavorite(concert)}
                 className={`text-xs font-mono rounded-full ${
                   isFavorited
-                    ? "text-red-400 bg-red-500/10"
-                    : "text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
+                    ? "text-[#DED5EB] bg-[#380E75]/20"
+                    : "text-zinc-500 hover:text-[#DED5EB] hover:bg-[#380E75]/10"
                 }`}
                 data-testid={`favorite-btn-${rank}`}
               >
@@ -190,7 +190,7 @@ export const ConcertCard = ({ concert, rank, onFavorite, isFavorited }) => {
               >
                 <Button
                   size="sm"
-                  className="bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 rounded-full text-xs font-mono"
+                  className="bg-[#380E75]/20 text-[#DED5EB] hover:bg-[#380E75]/30 border border-[#380E75]/30 rounded-full text-xs font-mono"
                 >
                   <Ticket className="w-3.5 h-3.5 mr-1.5" />
                   Tickets
@@ -219,7 +219,7 @@ export const ConcertCard = ({ concert, rank, onFavorite, isFavorited }) => {
           {/* Featured track */}
           {featured_track && (
             <div className="mt-3 flex items-center gap-2 text-xs text-zinc-500">
-              <Music2 className="w-3 h-3 text-teal-500" />
+              <Music2 className="w-3 h-3 text-[#DED5EB]/60" />
               <span className="font-mono">Featured: {featured_track}</span>
             </div>
           )}
