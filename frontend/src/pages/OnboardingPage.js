@@ -257,7 +257,7 @@ export default function OnboardingPage({ onSaveUser }) {
                   >
                     {loading ? (
                       <span className="flex items-center gap-2">
-                        <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                        <span className="w-4 h-4 border-2 border-[#DED5EB]/30 border-t-[#DED5EB] rounded-full animate-spin" />
                         Connecting...
                       </span>
                     ) : (
