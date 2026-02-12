@@ -123,8 +123,14 @@ async def build_taste_profile(user_id: str, access_token: str) -> TasteProfile:
     all_tracks = short_tracks.get("items", []) + medium_tracks.get("items", [])
     track_ids = list({t["id"] for t in all_tracks})
 
-    features_data = await spotify_service.get_audio_features(access_token, track_ids)
-    audio_features = compute_audio_features(features_data.get("audio_features", []))
+    # Audio features endpoint may be restricted (Spotify deprecated it for newer apps)
+    try:
+        features_data = await spotify_service.get_audio_features(access_token, track_ids)
+        audio_features = compute_audio_features(features_data.get("audio_features", []))
+    except Exception as e:
+        logger.warning(f"Audio features unavailable (Spotify API restriction): {e}")
+        # Estimate audio features from track popularity distribution
+        audio_features = _estimate_audio_features_from_artists(short_items + medium_items)
 
     profile = TasteProfile(
         user_id=user_id,
