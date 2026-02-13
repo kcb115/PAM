@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "homepage": "https://kcb115.github.io/PAM"
+  "homepage": "https://kcb115.github.io/PAM",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
