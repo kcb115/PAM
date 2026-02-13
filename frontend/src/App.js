@@ -27,7 +27,7 @@ function App() {
   return (
     <div className="noise-overlay min-h-screen">
       <Toaster position="top-right" richColors />
-      <BrowserRouter>
+      <BrowserRouter basename={process.env.PUBLIC_URL}>
         <Routes>
           <Route path="/" element={<LandingPage user={userData} />} />
           <Route
