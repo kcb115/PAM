@@ -8,3 +8,5 @@ python-multipart==0.0.22
 pydantic==2.12.5
 starlette==0.37.2
 cachetools==7.0.1
+dnspython==2.8.0
+certifi==2026.1.4
