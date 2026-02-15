@@ -8,37 +8,44 @@ import logging
 import uuid
 import certifi
 from pathlib import Path
-from typing import Optional, List
 from datetime import datetime, timezone
 
 from models import (
     User, UserCreate, UserUpdate, TasteProfile,
-    DiscoverRequest, DiscoverResponse, FavoriteCreate, Favorite, ShareProfile,
+    DiscoverRequest, DiscoverResponse, FavoriteCreate, Favorite,
 )
 import spotify_service
 import taste_profile as tp
 import jambase_service
 import matching
-import event_discovery
 import ticketmaster_service
 import geocoding
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / ".env")
 
 # MongoDB connection (use certifi CA bundle for SSL on cloud platforms)
-mongo_url = os.environ['MONGO_URL']
+mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url, tlsCAFile=certifi.where())
-db = client[os.environ['DB_NAME']]
+db = client[os.environ["DB_NAME"]]
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+def _frontend_base() -> str:
+    """
+    GitHub Pages + HashRouter expects redirects like:
+      https://kcb115.github.io/PAM/#/dashboard
+    We keep FRONTEND_URL without trailing slash, then append /#/...
+    """
+    return os.environ.get("FRONTEND_URL", "").rstrip("/")
 
 
 # ─── Health ──────────────────────────────────────────────
@@ -91,12 +98,18 @@ async def spotify_login(user_id: str = Query(...)):
 
 
 @api_router.get("/spotify/callback")
-async def spotify_callback(code: str = Query(...), state: str = Query(""), error: str = Query(None)):
+async def spotify_callback(
+    code: str = Query(...),
+    state: str = Query(""),
+    error: str = Query(None),
+):
     """Handle Spotify OAuth callback."""
+    frontend_url = _frontend_base()
+
     if error:
         logger.error(f"Spotify auth error: {error}")
-        frontend_url = os.environ.get("FRONTEND_URL", "")
-        return RedirectResponse(url=f"{frontend_url}/?error={error}")
+        # HashRouter-friendly redirect to landing route
+        return RedirectResponse(url=f"{frontend_url}/#/?error={error}", status_code=302)
 
     # Extract user_id from state
     user_id = state.split(":")[0] if ":" in state else ""
@@ -105,22 +118,33 @@ async def spotify_callback(code: str = Query(...), state: str = Query(""), error
         token_data = await spotify_service.exchange_code(code)
     except Exception as e:
         logger.error(f"Token exchange failed: {e}")
-        frontend_url = os.environ.get("FRONTEND_URL", "")
-        return RedirectResponse(url=f"{frontend_url}/?error=token_exchange_failed")
+        return RedirectResponse(
+            url=f"{frontend_url}/#/?error=token_exchange_failed",
+            status_code=302,
+        )
 
     access_token = token_data.get("access_token")
     refresh_tok = token_data.get("refresh_token")
     expires_in = token_data.get("expires_in", 3600)
 
+    if not access_token:
+        logger.error("Token exchange succeeded but no access_token returned.")
+        return RedirectResponse(
+            url=f"{frontend_url}/#/?error=token_exchange_failed",
+            status_code=302,
+        )
+
     # Store tokens server-side in MongoDB
     session_id = str(uuid.uuid4())
-    await db.spotify_sessions.insert_one({
-        "session_id": session_id,
-        "user_id": user_id,
-        "access_token": access_token,
-        "refresh_token": refresh_tok,
-        "expires_in": expires_in,
-    })
+    await db.spotify_sessions.insert_one(
+        {
+            "session_id": session_id,
+            "user_id": user_id,
+            "access_token": access_token,
+            "refresh_token": refresh_tok,
+            "expires_in": expires_in,
+        }
+    )
 
     # Get Spotify profile and update user
     try:
@@ -133,10 +157,10 @@ async def spotify_callback(code: str = Query(...), state: str = Query(""), error
     except Exception as e:
         logger.warning(f"Failed to get Spotify profile: {e}")
 
-    # Redirect back to frontend with session info
-    frontend_url = os.environ.get("FRONTEND_URL", "")
+    # Redirect back to frontend with session info (HashRouter => /#/)
     return RedirectResponse(
-        url=f"{frontend_url}/dashboard?session_id={session_id}&user_id={user_id}"
+        url=f"{frontend_url}/#/dashboard?session_id={session_id}&user_id={user_id}",
+        status_code=302,
     )
 
 
@@ -175,7 +199,10 @@ async def build_taste_profile(session_id: str = Query(...), user_id: str = Query
             profile = await tp.build_taste_profile(user_id, access_token)
         except Exception as e2:
             logger.error(f"Taste profile build failed after refresh: {e2}")
-            raise HTTPException(status_code=500, detail=f"Failed to build taste profile: {str(e2)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to build taste profile: {str(e2)}",
+            )
 
     # Store in DB
     doc = profile.model_dump()
@@ -190,7 +217,10 @@ async def get_taste_profile(user_id: str):
     """Get the stored taste profile for a user."""
     profile = await db.taste_profiles.find_one({"user_id": user_id}, {"_id": 0})
     if not profile:
-        raise HTTPException(status_code=404, detail="Taste profile not found. Build one first.")
+        raise HTTPException(
+            status_code=404,
+            detail="Taste profile not found. Build one first.",
+        )
     return profile
 
 
@@ -223,14 +253,19 @@ async def discover_concerts(data: DiscoverRequest):
             concerts=[],
             taste_profile=taste,
             total_events_scanned=0,
-            message=f"Could not find coordinates for '{data.city}'. Try a more specific city name (e.g., 'Roanoke, VA').",
+            message=(
+                f"Could not find coordinates for '{data.city}'. "
+                "Try a more specific city name (e.g., 'Roanoke, VA')."
+            ),
             source="geocoding_error",
         )
 
     logger.info(f"Geocoded '{data.city}' to {geo['lat']}, {geo['lng']}")
 
     # Step 2: Map user's top genres to Jambase genre slugs
-    genre_slugs = jambase_service.get_jambase_slugs_for_profile(taste.root_genre_map, max_slugs=5)
+    genre_slugs = jambase_service.get_jambase_slugs_for_profile(
+        taste.root_genre_map, max_slugs=5
+    )
     logger.info(f"Jambase genre slugs for user: {genre_slugs}")
 
     # Parse date filters
@@ -267,8 +302,10 @@ async def discover_concerts(data: DiscoverRequest):
     # If Jambase returned nothing, try Ticketmaster as fallback
     if not events:
         tm_data = await ticketmaster_service.search_events(
-            city=data.city, radius=data.radius,
-            date_from=data.date_from, date_to=data.date_to,
+            city=data.city,
+            radius=data.radius,
+            date_from=data.date_from,
+            date_to=data.date_to,
         )
         tm_events = tm_data.get("events", [])
         if tm_events:
@@ -308,11 +345,13 @@ async def discover_concerts(data: DiscoverRequest):
 @api_router.post("/favorites")
 async def add_favorite(data: FavoriteCreate):
     """Save a concert to favorites."""
-    # Check for duplicate
-    existing = await db.favorites.find_one({
-        "user_id": data.user_id,
-        "concert.event_id": data.concert.event_id,
-    }, {"_id": 0})
+    existing = await db.favorites.find_one(
+        {
+            "user_id": data.user_id,
+            "concert.event_id": data.concert.event_id,
+        },
+        {"_id": 0},
+    )
     if existing:
         return {k: v for k, v in existing.items() if k != "_id"}
 
@@ -350,7 +389,6 @@ async def create_share(user_id: str = Query(...)):
     if not profile:
         raise HTTPException(status_code=400, detail="No taste profile to share")
 
-    # Create or update share
     share_id = uuid.uuid4().hex[:10]
 
     top_genres = sorted(
@@ -370,7 +408,6 @@ async def create_share(user_id: str = Query(...)):
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    # Upsert
     await db.shares.update_one(
         {"user_id": user_id},
         {"$set": share_doc},
@@ -404,7 +441,6 @@ async def events_api_status():
 async def set_ticketmaster_key(key: str = Query(...)):
     """Set the Ticketmaster API key at runtime."""
     os.environ["TICKETMASTER_API_KEY"] = key
-    # Quick validation
     try:
         result = await ticketmaster_service.search_events("New York", radius=10, size=1)
         if result.get("error") in ("invalid_key",):
@@ -421,7 +457,7 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=False,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )
