@@ -94,7 +94,7 @@ async def spotify_callback(code: str = Query(...), state: str = Query(""), error
     """Handle Spotify OAuth callback."""
     if error:
         logger.error(f"Spotify auth error: {error}")
-        frontend_url = os.environ.get("SPOTIFY_REDIRECT_URI", "").replace("/api/spotify/callback", "")
+        frontend_url = os.environ.get("FRONTEND_URL", "")
         return RedirectResponse(url=f"{frontend_url}/?error={error}")
 
     # Extract user_id from state
@@ -104,7 +104,7 @@ async def spotify_callback(code: str = Query(...), state: str = Query(""), error
         token_data = await spotify_service.exchange_code(code)
     except Exception as e:
         logger.error(f"Token exchange failed: {e}")
-        frontend_url = os.environ.get("SPOTIFY_REDIRECT_URI", "").replace("/api/spotify/callback", "")
+        frontend_url = os.environ.get("FRONTEND_URL", "")
         return RedirectResponse(url=f"{frontend_url}/?error=token_exchange_failed")
 
     access_token = token_data.get("access_token")
@@ -133,7 +133,7 @@ async def spotify_callback(code: str = Query(...), state: str = Query(""), error
         logger.warning(f"Failed to get Spotify profile: {e}")
 
     # Redirect back to frontend with session info
-    frontend_url = os.environ.get("SPOTIFY_REDIRECT_URI", "").replace("/api/spotify/callback", "")
+    frontend_url = os.environ.get("FRONTEND_URL", "")
     return RedirectResponse(
         url=f"{frontend_url}/dashboard?session_id={session_id}&user_id={user_id}"
     )
