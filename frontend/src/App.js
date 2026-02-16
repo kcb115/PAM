@@ -1,6 +1,6 @@
 import { useState } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { HashRouter, Routes, Route } from "react-router-dom";
 import LandingPage from "@/pages/LandingPage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import DashboardPage from "@/pages/DashboardPage";
@@ -27,7 +27,7 @@ function App() {
   return (
     <div className="noise-overlay min-h-screen">
       <Toaster position="top-right" richColors />
-      <BrowserRouter basename={process.env.PUBLIC_URL}>
+      <HashRouter>
         <Routes>
           <Route path="/" element={<LandingPage user={userData} />} />
           <Route
@@ -46,7 +46,7 @@ function App() {
           />
           <Route path="/share/:shareId" element={<SharePage />} />
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </div>
   );
 }
