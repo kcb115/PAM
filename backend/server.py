@@ -60,6 +60,7 @@ async def create_user(data: UserCreate):
     user = User(
         name=data.name,
         email=data.email,
+        city=data.city,
         concerts_per_month=data.concerts_per_month,
         ticket_budget=data.ticket_budget,
     )
