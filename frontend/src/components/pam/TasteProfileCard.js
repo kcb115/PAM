@@ -1,14 +1,7 @@
-import {
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  ResponsiveContainer,
-} from "recharts";
 import { Badge } from "@/components/ui/badge";
 
 export const TasteProfileCard = ({ profile }) => {
-  const { genre_map, root_genre_map, audio_features } = profile;
+  const { genre_map, root_genre_map } = profile;
 
   // Top genres for display
   const topGenres = Object.entries(genre_map || {})
@@ -19,55 +12,12 @@ export const TasteProfileCard = ({ profile }) => {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8);
 
-  // Radar chart data
-  const radarData = [
-    { label: "Energy", value: audio_features?.energy || 0 },
-    { label: "Dance", value: audio_features?.danceability || 0 },
-    { label: "Mood", value: audio_features?.valence || 0 },
-    { label: "Acoustic", value: audio_features?.acousticness || 0 },
-    { label: "Instrumental", value: audio_features?.instrumentalness || 0 },
-  ];
-
-  // Tempo display
-  const tempo = audio_features?.tempo || 0;
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" data-testid="taste-profile-card">
-      {/* Audio Features Radar */}
-      <div className="glass-card p-6 lg:col-span-1">
-        <p className="font-mono text-xs uppercase tracking-[0.15em] text-zinc-500 mb-4">
-          Sound Fingerprint
-        </p>
-        <div className="h-52">
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="75%">
-              <PolarGrid stroke="rgba(255,255,255,0.06)" />
-              <PolarAngleAxis
-                dataKey="label"
-                tick={{ fill: "#a1a1aa", fontSize: 11, fontFamily: "JetBrains Mono" }}
-              />
-              <Radar
-                dataKey="value"
-                stroke="#DED5EB"
-                fill="#380E75"
-                fillOpacity={0.25}
-                strokeWidth={2}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="mt-2 flex items-center justify-center gap-2" data-testid="tempo-display">
-          <span className="font-mono text-xs text-zinc-500">AVG TEMPO</span>
-          <span className="font-mono text-sm text-[#DED5EB] font-bold">
-            {Math.round(tempo)} BPM
-          </span>
-        </div>
-      </div>
-
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" data-testid="taste-profile-card">
       {/* Root Genres (weighted) */}
-      <div className="glass-card p-6 lg:col-span-1">
+      <div className="glass-card p-6">
         <p className="font-mono text-xs uppercase tracking-[0.15em] text-zinc-500 mb-4">
-          Your DNA
+          Your Top Genres
         </p>
         <div className="space-y-3" data-testid="root-genres-list">
           {topRootGenres.map(([genre, weight]) => (
@@ -98,7 +48,7 @@ export const TasteProfileCard = ({ profile }) => {
       </div>
 
       {/* Detailed Genre Tags */}
-      <div className="glass-card p-6 lg:col-span-1">
+      <div className="glass-card p-6">
         <p className="font-mono text-xs uppercase tracking-[0.15em] text-zinc-500 mb-4">
           Genre Cloud
         </p>
