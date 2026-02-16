@@ -29,11 +29,12 @@ export const LocationSearch = ({ onSearch, loading, defaultCity, defaultRadius }
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!city.trim()) return;
+    if (!dateFrom || !dateTo) return;
     onSearch(
       city.trim(),
       parseInt(radius),
-      dateFrom ? dateFrom.toISOString() : null,
-      dateTo ? dateTo.toISOString() : null,
+      dateFrom.toISOString(),
+      dateTo.toISOString(),
     );
   };
 
@@ -50,7 +51,7 @@ export const LocationSearch = ({ onSearch, loading, defaultCity, defaultRadius }
 
       <form onSubmit={handleSubmit} className="glass-card p-6">
         <div className="flex flex-col gap-4">
-          {/* Top row: city + radius + button */}
+          {/* Top row: city + radius */}
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <Label className="text-xs font-mono uppercase tracking-wider text-zinc-500 mb-2 flex items-center gap-1.5">
@@ -89,32 +90,11 @@ export const LocationSearch = ({ onSearch, loading, defaultCity, defaultRadius }
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="flex items-end">
-              <Button
-                type="submit"
-                disabled={loading || !city.trim()}
-                className="w-full sm:w-auto bg-[#380E75] text-[#DED5EB] font-syne font-bold uppercase tracking-wider rounded-full h-12 px-8 hover:bg-[#380E75]/80 transition-colors duration-200 disabled:opacity-50"
-                data-testid="discover-btn"
-              >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                    Searching...
-                  </span>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4 mr-2" />
-                    Discover
-                  </>
-                )}
-              </Button>
-            </div>
           </div>
 
-          {/* Date filter row */}
+          {/* Date range row */}
           <div className="flex flex-col sm:flex-row gap-4 pt-2 border-t border-white/5">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Label className="text-xs font-mono uppercase tracking-wider text-zinc-500 flex items-center gap-1.5 shrink-0">
                 <CalendarIcon className="w-3 h-3" /> Date Range
               </Label>
@@ -123,10 +103,10 @@ export const LocationSearch = ({ onSearch, loading, defaultCity, defaultRadius }
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="bg-secondary/50 border-white/10 h-10 px-3 font-mono text-xs rounded-lg text-zinc-400 hover:text-white"
+                    className={`bg-secondary/50 border-white/10 h-10 px-3 font-mono text-xs rounded-lg hover:text-white ${dateFrom ? "text-white" : "text-zinc-400"}`}
                     data-testid="date-from-btn"
                   >
-                    {dateFrom ? format(dateFrom, "MMM d") : "From"}
+                    {dateFrom ? format(dateFrom, "MMM d, yyyy") : "Select start date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 bg-zinc-900 border-white/10" align="start">
@@ -146,10 +126,10 @@ export const LocationSearch = ({ onSearch, loading, defaultCity, defaultRadius }
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="bg-secondary/50 border-white/10 h-10 px-3 font-mono text-xs rounded-lg text-zinc-400 hover:text-white"
+                    className={`bg-secondary/50 border-white/10 h-10 px-3 font-mono text-xs rounded-lg hover:text-white ${dateTo ? "text-white" : "text-zinc-400"}`}
                     data-testid="date-to-btn"
                   >
-                    {dateTo ? format(dateTo, "MMM d") : "To"}
+                    {dateTo ? format(dateTo, "MMM d, yyyy") : "Select end date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 bg-zinc-900 border-white/10" align="start">
@@ -176,6 +156,28 @@ export const LocationSearch = ({ onSearch, loading, defaultCity, defaultRadius }
                 </Button>
               )}
             </div>
+          </div>
+
+          {/* Discover button */}
+          <div className="pt-2">
+            <Button
+              type="submit"
+              disabled={loading || !city.trim() || !dateFrom || !dateTo}
+              className="w-full bg-[#380E75] text-[#DED5EB] font-syne font-bold uppercase tracking-wider rounded-full h-12 px-8 hover:bg-[#380E75]/80 transition-colors duration-200 disabled:opacity-50"
+              data-testid="discover-btn"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                  Searching...
+                </span>
+              ) : (
+                <>
+                  <Search className="w-4 h-4 mr-2" />
+                  Discover
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </form>
