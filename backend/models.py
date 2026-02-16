@@ -7,6 +7,7 @@ import uuid
 class UserCreate(BaseModel):
     name: str
     email: str
+    city: Optional[str] = None
     concerts_per_month: int = 2
     ticket_budget: float = 50.0
 
