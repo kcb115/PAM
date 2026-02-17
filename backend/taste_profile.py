@@ -1,6 +1,7 @@
 """
 Taste Profile Builder.
 Aggregates genre tags from Spotify data to create a user's genre summary.
+Uses raw Spotify genre strings without simplification.
 """
 import logging
 from collections import defaultdict
@@ -10,51 +11,23 @@ import musicbrainz_service
 
 logger = logging.getLogger(__name__)
 
-# Root genre terms for fuzzy matching
-ROOT_GENRES = [
-    "indie", "folk", "electronic", "punk", "soul", "jazz", "metal",
-    "hip hop", "rap", "rock", "pop", "r&b", "country", "blues",
-    "classical", "ambient", "dance", "house", "techno", "reggae",
-    "funk", "gospel", "latin", "ska", "grunge", "emo", "shoegaze",
-    "dream pop", "synth", "disco", "garage", "psychedelic", "lo-fi",
-    "lofi", "alternative", "experimental", "post-punk", "new wave",
-    "math rock", "prog", "singer-songwriter", "americana", "bluegrass",
-    "hardcore", "noise", "industrial", "trap", "drill", "grime",
-    "afrobeat", "bossa nova", "world",
-]
-
-
-def extract_root_genres(genre_string: str) -> list:
-    """Extract root genre terms from a detailed Spotify genre string."""
-    genre_lower = genre_string.lower()
-    found = []
-    for root in ROOT_GENRES:
-        if root in genre_lower:
-            found.append(root)
-    if not found:
-        found.append(genre_lower.strip())
-    return found
-
 
 def build_genre_map(artists_data: list, time_range_weight: float = 1.0) -> dict:
-    """Build weighted genre maps from artist data."""
+    """Build weighted genre map from artist data using raw Spotify tags."""
     genre_counts = defaultdict(float)
-    root_genre_counts = defaultdict(float)
 
     for i, artist in enumerate(artists_data):
         position_weight = max(1.0 - (i * 0.015), 0.2)
         weight = position_weight * time_range_weight
 
         for genre in artist.get("genres", []):
-            genre_counts[genre] += weight
-            for root in extract_root_genres(genre):
-                root_genre_counts[root] += weight
+            genre_counts[genre.lower().strip()] += weight
 
-    return dict(genre_counts), dict(root_genre_counts)
+    return dict(genre_counts)
 
 
 async def build_taste_profile(user_id: str, access_token: str) -> TasteProfile:
-    """Build a genre-only taste profile from the user's Spotify data."""
+    """Build a genre taste profile from the user's Spotify data."""
     logger.info(f"Building taste profile for user {user_id}")
 
     # Fetch top artists for both time ranges
@@ -81,30 +54,22 @@ async def build_taste_profile(user_id: str, access_token: str) -> TasteProfile:
                     artist["genres"] = mb_genres[name]
 
     # Build genre maps (short_term weighted more heavily - recent taste)
-    short_genre, short_root = build_genre_map(short_items, time_range_weight=1.5)
-    medium_genre, medium_root = build_genre_map(medium_items, time_range_weight=1.0)
+    short_genres = build_genre_map(short_items, time_range_weight=1.5)
+    medium_genres = build_genre_map(medium_items, time_range_weight=1.0)
 
-    # Merge genre maps
-    combined_genre = defaultdict(float)
-    combined_root = defaultdict(float)
-    for g, w in short_genre.items():
-        combined_genre[g] += w
-    for g, w in medium_genre.items():
-        combined_genre[g] += w
-    for g, w in short_root.items():
-        combined_root[g] += w
-    for g, w in medium_root.items():
-        combined_root[g] += w
+    # Merge
+    combined = defaultdict(float)
+    for g, w in short_genres.items():
+        combined[g] += w
+    for g, w in medium_genres.items():
+        combined[g] += w
 
-    # Normalize genre maps
-    max_genre_val = max(combined_genre.values()) if combined_genre else 1
-    max_root_val = max(combined_root.values()) if combined_root else 1
-    normalized_genre = {k: round(v / max_genre_val, 3) for k, v in combined_genre.items()}
-    normalized_root = {k: round(v / max_root_val, 3) for k, v in combined_root.items()}
+    # Normalize
+    max_val = max(combined.values()) if combined else 1
+    normalized = {k: round(v / max_val, 3) for k, v in combined.items()}
 
     # Sort by weight descending
-    sorted_genre = dict(sorted(normalized_genre.items(), key=lambda x: x[1], reverse=True))
-    sorted_root = dict(sorted(normalized_root.items(), key=lambda x: x[1], reverse=True))
+    sorted_genres = dict(sorted(normalized.items(), key=lambda x: x[1], reverse=True))
 
     # Collect all unique top artist IDs and names
     all_artists = {a["id"]: a["name"] for a in short_items + medium_items}
@@ -113,12 +78,12 @@ async def build_taste_profile(user_id: str, access_token: str) -> TasteProfile:
 
     profile = TasteProfile(
         user_id=user_id,
-        genre_map=sorted_genre,
-        root_genre_map=sorted_root,
+        genre_map=sorted_genres,
+        root_genre_map=sorted_genres,
         audio_features=AudioFeatures(),
         top_artist_ids=top_artist_ids,
         top_artist_names=top_artist_names,
     )
 
-    logger.info(f"Taste profile built: {len(sorted_genre)} genres, {len(sorted_root)} root genres, {len(top_artist_ids)} artists")
+    logger.info(f"Taste profile built: {len(sorted_genres)} genres, {len(top_artist_ids)} artists")
     return profile
