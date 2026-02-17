@@ -1,9 +1,9 @@
 """
 Concert Matching Engine.
-Fuzzy genre matching + ranking algorithm.
+Direct genre string matching + ranking algorithm.
 
-This module is designed to be swappable with a future
-embedding-based similarity system (NVIDIA NIM).
+Compares raw Spotify genre tags from concert artists against
+the user's genre profile without any simplification.
 """
 import logging
 from typing import List, Dict, Optional
@@ -13,73 +13,51 @@ import spotify_service
 logger = logging.getLogger(__name__)
 
 
-def _extract_root_terms(genre_string: str) -> set:
-    """Extract root genre terms from a genre string for fuzzy matching."""
-    ROOT_TERMS = {
-        "indie", "folk", "electronic", "punk", "soul", "jazz", "metal",
-        "hip hop", "rap", "rock", "pop", "r&b", "country", "blues",
-        "classical", "ambient", "dance", "house", "techno", "reggae",
-        "funk", "gospel", "latin", "ska", "grunge", "emo", "shoegaze",
-        "dream pop", "synth", "disco", "garage", "psychedelic", "lo-fi",
-        "lofi", "alternative", "experimental", "post-punk", "new wave",
-        "singer-songwriter", "americana", "bluegrass", "hardcore",
-        "noise", "industrial", "trap", "drill", "grime", "afrobeat",
-        "bossa nova", "world", "prog",
-    }
-    genre_lower = genre_string.lower()
-    found = set()
-    for term in ROOT_TERMS:
-        if term in genre_lower:
-            found.add(term)
-    return found
-
-
 def compute_genre_match_score(
     artist_genres: List[str],
-    user_root_genre_map: Dict[str, float]
+    user_genre_map: Dict[str, float]
 ) -> tuple:
     """
     Compute genre match score between an artist's genres and user's taste.
+    Compares raw Spotify genre strings directly.
     Returns (score 0-100, list of matching genres, explanation text).
     """
-    if not artist_genres or not user_root_genre_map:
+    if not artist_genres or not user_genre_map:
         return 0.0, [], "No genre data available"
 
-    # Extract root terms from artist genres
-    artist_roots = set()
-    for g in artist_genres:
-        artist_roots.update(_extract_root_terms(g))
+    # Normalize artist genres to lowercase
+    artist_genres_lower = [g.lower().strip() for g in artist_genres]
 
-    if not artist_roots:
+    if not artist_genres_lower:
         return 0.0, [], "No recognizable genre terms"
 
-    # Calculate weighted match
+    # Direct match: check which artist genres appear in user's profile
     total_weight = 0.0
     matched_terms = []
-    for root in artist_roots:
-        if root in user_root_genre_map:
-            total_weight += user_root_genre_map[root]
-            matched_terms.append(root)
+    for genre in artist_genres_lower:
+        if genre in user_genre_map:
+            total_weight += user_genre_map[genre]
+            matched_terms.append(genre)
 
     if not matched_terms:
         return 0.0, [], "No genre overlap found"
 
-    # Normalize score: ratio of matched weight to possible weight
-    max_possible = sum(sorted(user_root_genre_map.values(), reverse=True)[:len(artist_roots)])
+    # Normalize score: ratio of matched weight to best possible weight
+    max_possible = sum(sorted(user_genre_map.values(), reverse=True)[:len(artist_genres_lower)])
     if max_possible == 0:
         return 0.0, matched_terms, "Minimal overlap"
 
     raw_score = (total_weight / max_possible) * 100
-    # Boost for more overlapping terms
-    overlap_ratio = len(matched_terms) / len(artist_roots)
+    # Boost for more overlapping genres
+    overlap_ratio = len(matched_terms) / len(artist_genres_lower)
     score = min(raw_score * (0.7 + 0.3 * overlap_ratio), 99.0)
 
     # Build explanation
-    top_user_genres = sorted(user_root_genre_map.items(), key=lambda x: x[1], reverse=True)[:5]
+    top_user_genres = sorted(user_genre_map.items(), key=lambda x: x[1], reverse=True)[:5]
     top_user_names = [g[0] for g in top_user_genres]
 
     explanation = f"Your top genres include {', '.join(top_user_names[:3])}. "
-    explanation += f"This artist blends {', '.join(matched_terms[:4])}."
+    explanation += f"This artist's genres include {', '.join(matched_terms[:4])}."
 
     return round(score, 1), matched_terms, explanation
 
@@ -112,6 +90,9 @@ async def match_and_rank_concerts(
     results = []
     known_artist_names_lower = {n.lower() for n in taste_profile.top_artist_names}
 
+    # Use root_genre_map (which now contains the raw Spotify genres)
+    user_genre_map = taste_profile.root_genre_map
+
     for event in events:
         artist_names = event.get("artist_names", [])
         if not artist_names:
@@ -143,7 +124,7 @@ async def match_and_rank_concerts(
 
         # Compute genre match score
         score, matched_terms, explanation = compute_genre_match_score(
-            artist_genres, taste_profile.root_genre_map
+            artist_genres, user_genre_map
         )
 
         # Add indie bonus
