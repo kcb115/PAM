@@ -1,28 +1,26 @@
 import { Badge } from "@/components/ui/badge";
 
 export const TasteProfileCard = ({ profile }) => {
-  const { genre_map, root_genre_map } = profile;
+  const { genre_map } = profile;
 
-  // Top genres for display
-  const topGenres = Object.entries(genre_map || {})
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 12);
+  const allGenres = Object.entries(genre_map || {})
+    .sort((a, b) => b[1] - a[1]);
 
-  const topRootGenres = Object.entries(root_genre_map || {})
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8);
+  // Top 8 as bars, rest as cloud
+  const topGenres = allGenres.slice(0, 8);
+  const remainingGenres = allGenres.slice(8, 20);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" data-testid="taste-profile-card">
-      {/* Root Genres (weighted) */}
+      {/* Top Genres (weighted bars) */}
       <div className="glass-card p-6">
         <p className="font-mono text-xs uppercase tracking-[0.15em] text-zinc-500 mb-4">
           Your Top Genres
         </p>
         <div className="space-y-3" data-testid="root-genres-list">
-          {topRootGenres.map(([genre, weight]) => (
+          {topGenres.map(([genre, weight]) => (
             <div key={genre} className="flex items-center gap-3">
-              <span className="font-jakarta text-sm text-zinc-300 w-24 truncate capitalize">
+              <span className="font-jakarta text-sm text-zinc-300 w-32 truncate capitalize">
                 {genre}
               </span>
               <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
@@ -47,20 +45,20 @@ export const TasteProfileCard = ({ profile }) => {
         </div>
       </div>
 
-      {/* Detailed Genre Tags */}
+      {/* Genre Cloud */}
       <div className="glass-card p-6">
         <p className="font-mono text-xs uppercase tracking-[0.15em] text-zinc-500 mb-4">
           Genre Cloud
         </p>
         <div className="flex flex-wrap gap-2" data-testid="genre-cloud">
-          {topGenres.map(([genre, weight]) => (
+          {remainingGenres.map(([genre, weight]) => (
             <Badge
               key={genre}
               variant="secondary"
               className={`text-xs font-mono border transition-colors duration-200 cursor-default ${
-                weight > 0.7
+                weight > 0.5
                   ? "border-[#DED5EB]/30 bg-[#380E75]/20 text-[#DED5EB]"
-                  : weight > 0.4
+                  : weight > 0.25
                   ? "border-[#380E75]/30 bg-[#380E75]/10 text-[#DED5EB]/70"
                   : "border-white/10 bg-white/5 text-zinc-400"
               }`}
