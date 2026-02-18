@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { TasteProfileCard } from "@/components/pam/TasteProfileCard";
+import { TopArtistsCard } from "@/components/pam/TopArtistsCard";
 import { LocationSearch } from "@/components/pam/LocationSearch";
 import { ConcertList } from "@/components/pam/ConcertList";
 import { FavoritesList } from "@/components/pam/FavoritesList";
