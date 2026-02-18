@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Music, ArrowRight, Radio, MapPin, Sparkles } from "lucide-react";
+import { ArrowRight, Radio, MapPin, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 
@@ -24,7 +24,10 @@ export default function LandingPage({ user }) {
   };
 
   return (
-    <div className="hero-gradient min-h-screen relative overflow-hidden" data-testid="landing-page">
+    <div
+      className="hero-gradient min-h-screen relative overflow-hidden"
+      data-testid="landing-page"
+    >
       {/* Ambient light spots */}
       <div className="absolute top-0 left-[20%] w-[500px] h-[500px] bg-[#380E75]/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 right-[10%] w-[400px] h-[400px] bg-[#DED5EB]/4 rounded-full blur-[100px] pointer-events-none" />
@@ -32,11 +35,17 @@ export default function LandingPage({ user }) {
       {/* Nav */}
       <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6">
         <div className="flex items-center gap-2">
-          <img src={`${process.env.PUBLIC_URL}/PAM_logo_nav.png`} alt="PAM" className="w-10 h-10" />
-          </div>
-          <span className="font-syne font-extrabold text-xl tracking-tight">PAM</span>
+          <img
+            src={`${process.env.PUBLIC_URL}/PAM_logo_nav.png`}
+            alt="PAM"
+            className="w-10 h-10"
+          />
+          <span className="font-syne font-extrabold text-xl tracking-tight">
+            PAM
+          </span>
           <span className="text-sm text-zinc-500 ml-2">Your concert buddy</span>
         </div>
+
         {user && (
           <Button
             variant="ghost"
@@ -85,7 +94,7 @@ export default function LandingPage({ user }) {
             data-testid="hero-description"
           >
             PAM analyzes your Spotify taste and discovers local concerts by
-            independent artists you haven't heard yet — but will love.
+            independent artists you haven&apos;t heard yet — but will love.
           </motion.p>
 
           <motion.div
@@ -140,8 +149,12 @@ export default function LandingPage({ user }) {
               <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center mb-4 group-hover:bg-white/10 transition-colors duration-300">
                 {feature.icon}
               </div>
-              <h3 className="font-syne font-bold text-base mb-2">{feature.title}</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">{feature.desc}</p>
+              <h3 className="font-syne font-bold text-base mb-2">
+                {feature.title}
+              </h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                {feature.desc}
+              </p>
             </div>
           ))}
         </motion.div>
