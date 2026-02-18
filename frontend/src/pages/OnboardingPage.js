@@ -92,6 +92,7 @@ export default function OnboardingPage({ onSaveUser }) {
             <Music className="w-4 h-4 text-[#DED5EB]" />
           </div>
           <span className="font-syne font-extrabold text-xl tracking-tight">PAM</span>
+          <span className="text-sm text-zinc-500 ml-2">Your concert buddy</span>
         </div>
         <Button
           variant="ghost"
