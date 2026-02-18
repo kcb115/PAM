@@ -209,6 +209,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
               <Music className="w-4 h-4 text-[#DED5EB]" />
             </div>
             <span className="font-syne font-extrabold text-lg tracking-tight">PAM</span>
+            <span className="text-xs text-zinc-500 ml-2 hidden sm:inline">Your concert buddy</span>
           </div>
 
           <div className="flex items-center gap-3">
