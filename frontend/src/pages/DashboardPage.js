@@ -205,11 +205,9 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
       <nav className="sticky top-0 z-50 bg-black/60 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 md:px-8 flex items-center justify-between h-16">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#380E75] flex items-center justify-center">
-              <Music className="w-4 h-4 text-[#DED5EB]" />
-            </div>
+            <img src={`${process.env.PUBLIC_URL}/PAM_logo_v1.png`} alt="PAM" className="w-9 h-9 rounded-full" />
             <span className="font-syne font-extrabold text-lg tracking-tight">PAM</span>
-            <span className="text-xs text-zinc-500 ml-2 hidden sm:inline">Your concert buddy</span>
+            <span className="text-xs text-zinc-500 ml-1 hidden sm:inline">Your concert buddy</span>
           </div>
 
           <div className="flex items-center gap-3">
