@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Music, ArrowRight, ArrowLeft, User, DollarSign, Calendar, MapPin } from "lucide-react";
+import { ArrowRight, ArrowLeft, User, DollarSign, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,6 @@ export default function OnboardingPage({ onSaveUser }) {
   const [form, setForm] = useState({
     name: "",
     email: "",
-    city: "",
     concerts_per_month: 2,
     ticket_budget: 50,
   });
@@ -35,10 +34,6 @@ export default function OnboardingPage({ onSaveUser }) {
         toast.error("Please enter a valid email");
         return;
       }
-      if (!form.city.trim() || !form.city.includes(",")) {
-        toast.error("Please enter your location as City, State (e.g. Roanoke, VA)");
-        return;
-      }
     }
     setStep(2);
   };
@@ -49,7 +44,6 @@ export default function OnboardingPage({ onSaveUser }) {
       const res = await api.createUser({
         name: form.name,
         email: form.email,
-        city: form.city.trim(),
         concerts_per_month: form.concerts_per_month,
         ticket_budget: form.ticket_budget,
       });
@@ -89,9 +83,8 @@ export default function OnboardingPage({ onSaveUser }) {
       <nav className="flex items-center justify-between px-6 md:px-12 py-6">
         <div className="flex items-center gap-2">
           <img src={`${process.env.PUBLIC_URL}/PAM_logo_nav.png`} alt="PAM" className="w-10 h-10" />
-          </div>
           <span className="font-syne font-extrabold text-xl tracking-tight">PAM</span>
-          <span className="text-sm text-zinc-500 ml-2">Your concert buddy</span>
+          <span className="text-sm text-zinc-500 ml-1">Your concert buddy</span>
         </div>
         <Button
           variant="ghost"
@@ -168,19 +161,6 @@ export default function OnboardingPage({ onSaveUser }) {
                       onChange={(e) => updateField("email", e.target.value)}
                       className="bg-secondary/50 border-white/10 h-12 px-4 font-jakarta text-sm placeholder:text-zinc-600 rounded-lg"
                       data-testid="email-input"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="city" className="text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2 flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5" /> Location
-                    </Label>
-                    <Input
-                      id="city"
-                      placeholder="e.g. Roanoke, VA"
-                      value={form.city}
-                      onChange={(e) => updateField("city", e.target.value)}
-                      className="bg-secondary/50 border-white/10 h-12 px-4 font-jakarta text-sm placeholder:text-zinc-600 rounded-lg"
-                      data-testid="city-input"
                     />
                   </div>
                 </div>
