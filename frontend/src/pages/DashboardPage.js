@@ -279,8 +279,11 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
           </div>
 
           {tasteProfile ? (
-            <TasteProfileCard profile={tasteProfile} />
-          ) : !loading ? (
+  <>
+    <TasteProfileCard profile={tasteProfile} />
+    <TopArtistsCard artists={tasteProfile.top_artist_names || []} />
+  </>
+) : !loading ? (
             <div className="glass-card p-8 text-center" data-testid="no-profile-state">
               <p className="text-zinc-400 mb-4">
                 {sessionId
