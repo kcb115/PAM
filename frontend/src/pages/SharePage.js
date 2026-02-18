@@ -87,8 +87,7 @@ export default function SharePage() {
 
       <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
-          <div className="w-8 h-8 rounded-lg bg-[#380E75] flex items-center justify-center">
-            <Music className="w-4 h-4 text-[#DED5EB]" />
+          <img src={`${process.env.PUBLIC_URL}/PAM_logo_nav.png`} alt="PAM" className="w-10 h-10" />
           </div>
           <span className="font-syne font-extrabold text-xl tracking-tight">PAM</span>
           <span className="text-sm text-zinc-500 ml-2">Your concert buddy</span>
