@@ -126,9 +126,9 @@ async def get_audio_features(access_token: str, track_ids: list) -> dict:
     return {"audio_features": all_features}
 
 
-async def search_artist(access_token: str, artist_name: str) -> dict:
+async def search_artist(access_token: str, artist_name: str, limit: int = 1, query: str = None) -> dict:
     return await _spotify_get(access_token, "/search", {
-        "q": artist_name,
+        "q": query or artist_name,
         "type": "artist",
-        "limit": 1,
+        "limit": limit,
     })
