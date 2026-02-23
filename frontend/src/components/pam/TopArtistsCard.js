@@ -10,7 +10,7 @@ export default function TopArtistsCard({ artists = [] }) {
 
   return (
     <div className="bg-white shadow-md rounded-2xl p-6 mt-6">
-      <h2 className="text-xl font-semibold mb-4">Top Spotify Artists</h2>
+      <h2 className="text-xl font-semibold mb-4 text-[#380E75]">Top Spotify Artists</h2>
 
       <ul className="space-y-2">
         {topTen.map((artist, index) => (
