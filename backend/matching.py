@@ -41,51 +41,41 @@ def _extract_tribute_target(artist_name: str) -> Optional[str]:
 
 async def _find_spotify_artist(access_token: str, artist_name: str) -> dict:
     """
-    Three-stage Spotify artist lookup:
-    1. Quoted artist search with best-match fuzzy scoring
-    2. Tribute/cover detection - search for the original artist
-    3. Fallback: raw unquoted search, take top result
-    Returns a Spotify artist dict or {}.
+    Spotify artist lookup with tribute/cover fallback.
+    1. Search by artist name, pick best fuzzy match from top 5 results.
+    2. If no good match, check for tribute/cover keywords and search for the original artist.
+    Always returns the best available result, or {} if Spotify is unreachable.
     """
-    # Stage 1: quoted search, pick closest name match
-    try:
-        result = await spotify_service.search_artist(
-            access_token, artist_name, limit=5, query=f'artist:"{artist_name}"'
-        )
-        candidates = result.get("artists", {}).get("items", [])
-        if candidates:
-            best = max(candidates, key=lambda a: _name_similarity(a.get("name", ""), artist_name))
-            if _name_similarity(best.get("name", ""), artist_name) >= 0.85:
-                return best
-    except Exception as e:
-        logger.warning(f"Spotify stage-1 search failed for '{artist_name}': {e}")
+    search_name = artist_name
 
-    # Stage 2: tribute/cover detection
+    async def _search(name: str) -> dict:
+        try:
+            result = await spotify_service.search_artist(access_token, name, limit=5)
+            candidates = result.get("artists", {}).get("items", [])
+            if not candidates:
+                return {}
+            # Pick the candidate whose name is closest to what we searched for
+            best = max(candidates, key=lambda a: _name_similarity(a.get("name", ""), name))
+            return best
+        except Exception as e:
+            logger.warning(f"Spotify search failed for '{name}': {e}")
+            return {}
+
+    # Primary search
+    result = await _search(search_name)
+    if result and _name_similarity(result.get("name", ""), search_name) >= 0.6:
+        return result
+
+    # Tribute/cover fallback - search for the original artist instead
     original = _extract_tribute_target(artist_name)
     if original:
-        try:
-            result = await spotify_service.search_artist(
-                access_token, original, limit=5, query=f'artist:"{original}"'
-            )
-            candidates = result.get("artists", {}).get("items", [])
-            if candidates:
-                best = max(candidates, key=lambda a: _name_similarity(a.get("name", ""), original))
-                if _name_similarity(best.get("name", ""), original) >= 0.80:
-                    logger.info(f"Tribute match: '{artist_name}' -> '{best.get('name')}'")
-                    return best
-        except Exception as e:
-            logger.warning(f"Spotify stage-2 tribute search failed for '{original}': {e}")
+        tribute_result = await _search(original)
+        if tribute_result:
+            logger.info(f"Tribute fallback: '{artist_name}' -> '{tribute_result.get('name')}'")
+            return tribute_result
 
-    # Stage 3: raw fallback
-    try:
-        result = await spotify_service.search_artist(access_token, artist_name, limit=1)
-        candidates = result.get("artists", {}).get("items", [])
-        if candidates:
-            return candidates[0]
-    except Exception as e:
-        logger.warning(f"Spotify stage-3 fallback search failed for '{artist_name}': {e}")
-
-    return {}
+    # Return whatever the primary search found, even if similarity was low
+    return result
 
 
 def compute_genre_match_score(
