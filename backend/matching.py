@@ -107,6 +107,7 @@ async def match_and_rank_concerts(
         # Check if event already has genre/popularity data (from Spotify discovery)
         artist_genres = event.get("genres", [])
         spotify_popularity = event.get("popularity")
+        spotify_artist_url = event.get("spotify_artist_url", "")
 
         # If no genre data, search Spotify
         if not artist_genres:
@@ -121,6 +122,7 @@ async def match_and_rank_concerts(
                 best_match = artists_found[0]
                 artist_genres = best_match.get("genres", [])
                 spotify_popularity = best_match.get("popularity")
+                spotify_artist_url = best_match.get("external_urls", {}).get("spotify", "")
 
         # Compute genre match score
         score, matched_terms, explanation = compute_genre_match_score(
@@ -147,6 +149,7 @@ async def match_and_rank_concerts(
             date=event.get("date", ""),
             ticket_url=event.get("ticket_url", ""),
             event_url=event.get("event_url", ""),
+            spotify_artist_url=spotify_artist_url,
             spotify_popularity=spotify_popularity,
             image_url=event.get("image_url", ""),
             featured_track=event.get("featured_track", ""),
