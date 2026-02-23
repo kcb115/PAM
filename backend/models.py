@@ -68,6 +68,7 @@ class ConcertMatch(BaseModel):
     time: Optional[str] = None
     ticket_url: Optional[str] = None
     event_url: Optional[str] = None
+    spotify_artist_url: Optional[str] = None
     spotify_popularity: Optional[int] = None
     image_url: Optional[str] = None
     featured_track: Optional[str] = None
