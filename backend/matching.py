@@ -1,4 +1,4 @@
-"""
+""""
 Concert Matching Engine.
 Direct genre string matching + ranking algorithm.
 
@@ -109,8 +109,8 @@ async def match_and_rank_concerts(
         spotify_popularity = event.get("popularity")
         spotify_artist_url = event.get("spotify_artist_url", "")
 
-        # If no genre data, search Spotify
-        if not artist_genres:
+        # Search Spotify if we need genres or a URL
+        if not artist_genres or not spotify_artist_url:
             try:
                 search_result = await spotify_service.search_artist(access_token, primary_artist)
                 artists_found = search_result.get("artists", {}).get("items", [])
@@ -120,8 +120,10 @@ async def match_and_rank_concerts(
 
             if artists_found:
                 best_match = artists_found[0]
-                artist_genres = best_match.get("genres", [])
-                spotify_popularity = best_match.get("popularity")
+                if not artist_genres:
+                    artist_genres = best_match.get("genres", [])
+                if not spotify_popularity:
+                    spotify_popularity = best_match.get("popularity")
                 spotify_artist_url = best_match.get("external_urls", {}).get("spotify", "")
 
         # Compute genre match score
