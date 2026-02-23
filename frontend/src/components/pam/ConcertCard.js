@@ -33,6 +33,7 @@ export const ConcertCard = ({ concert, rank, onFavorite, isFavorited }) => {
     time,
     ticket_url,
     event_url,
+    spotify_artist_url,
     spotify_popularity,
     featured_track,
   } = concert;
@@ -194,6 +195,31 @@ export const ConcertCard = ({ concert, rank, onFavorite, isFavorited }) => {
                 >
                   <Ticket className="w-3.5 h-3.5 mr-1.5" />
                   Tickets
+                  <ExternalLink className="w-3 h-3 ml-1" />
+                </Button>
+              </a>
+            )}
+
+            {spotify_artist_url && (
+              <a
+                href={spotify_artist_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid={`spotify-link-${rank}`}
+              >
+                <Button
+                  size="sm"
+                  className="rounded-full text-xs font-mono"
+                  style={{
+                    backgroundColor: "rgba(29,185,84,0.15)",
+                    color: "#1DB954",
+                    border: "1px solid rgba(29,185,84,0.3)",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = "rgba(29,185,84,0.25)"}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = "rgba(29,185,84,0.15)"}
+                >
+                  <Music2 className="w-3.5 h-3.5 mr-1.5" />
+                  Listen
                   <ExternalLink className="w-3 h-3 ml-1" />
                 </Button>
               </a>
