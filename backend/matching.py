@@ -6,11 +6,86 @@ Compares raw Spotify genre tags from concert artists against
 the user's genre profile without any simplification.
 """
 import logging
+import re
+from difflib import SequenceMatcher
 from typing import List, Dict, Optional
 from models import TasteProfile, ConcertMatch
 import spotify_service
 
 logger = logging.getLogger(__name__)
+
+# Patterns that indicate a tribute or cover band, and how to extract the original artist name
+TRIBUTE_PATTERNS = [
+    re.compile(r"^(.+?)\s+tribute\b", re.IGNORECASE),           # "X Tribute Band"
+    re.compile(r"\btribute\s+to\s+(.+)$", re.IGNORECASE),       # "Tribute to X"
+    re.compile(r"^a\s+tribute\s+to\s+(.+)$", re.IGNORECASE),    # "A Tribute to X"
+    re.compile(r"^(.+?)\s+cover\s+band$", re.IGNORECASE),       # "X Cover Band"
+    re.compile(r"^(.+?)\s+experience$", re.IGNORECASE),         # "The X Experience"
+    re.compile(r"^(.+?)\s+legacy$", re.IGNORECASE),             # "X Legacy"
+    re.compile(r"^(.+?)\s+salute$", re.IGNORECASE),             # "X Salute"
+    re.compile(r"^the\s+(.+?)\s+show$", re.IGNORECASE),         # "The X Show"
+]
+
+
+def _name_similarity(a: str, b: str) -> float:
+    return SequenceMatcher(None, a.lower().strip(), b.lower().strip()).ratio()
+
+
+def _extract_tribute_target(artist_name: str) -> Optional[str]:
+    for pattern in TRIBUTE_PATTERNS:
+        m = pattern.search(artist_name)
+        if m:
+            return m.group(1).strip()
+    return None
+
+
+async def _find_spotify_artist(access_token: str, artist_name: str) -> dict:
+    """
+    Three-stage Spotify artist lookup:
+    1. Quoted artist search with best-match fuzzy scoring
+    2. Tribute/cover detection - search for the original artist
+    3. Fallback: raw unquoted search, take top result
+    Returns a Spotify artist dict or {}.
+    """
+    # Stage 1: quoted search, pick closest name match
+    try:
+        result = await spotify_service.search_artist(
+            access_token, artist_name, limit=5, query=f'artist:"{artist_name}"'
+        )
+        candidates = result.get("artists", {}).get("items", [])
+        if candidates:
+            best = max(candidates, key=lambda a: _name_similarity(a.get("name", ""), artist_name))
+            if _name_similarity(best.get("name", ""), artist_name) >= 0.85:
+                return best
+    except Exception as e:
+        logger.warning(f"Spotify stage-1 search failed for '{artist_name}': {e}")
+
+    # Stage 2: tribute/cover detection
+    original = _extract_tribute_target(artist_name)
+    if original:
+        try:
+            result = await spotify_service.search_artist(
+                access_token, original, limit=5, query=f'artist:"{original}"'
+            )
+            candidates = result.get("artists", {}).get("items", [])
+            if candidates:
+                best = max(candidates, key=lambda a: _name_similarity(a.get("name", ""), original))
+                if _name_similarity(best.get("name", ""), original) >= 0.80:
+                    logger.info(f"Tribute match: '{artist_name}' -> '{best.get('name')}'")
+                    return best
+        except Exception as e:
+            logger.warning(f"Spotify stage-2 tribute search failed for '{original}': {e}")
+
+    # Stage 3: raw fallback
+    try:
+        result = await spotify_service.search_artist(access_token, artist_name, limit=1)
+        candidates = result.get("artists", {}).get("items", [])
+        if candidates:
+            return candidates[0]
+    except Exception as e:
+        logger.warning(f"Spotify stage-3 fallback search failed for '{artist_name}': {e}")
+
+    return {}
 
 
 def compute_genre_match_score(
@@ -109,21 +184,14 @@ async def match_and_rank_concerts(
         spotify_popularity = event.get("popularity")
         spotify_artist_url = event.get("spotify_artist_url", "")
 
-        # Always search Spotify to get artist URL; fill genres/popularity only if missing
-        try:
-            search_result = await spotify_service.search_artist(access_token, primary_artist)
-            artists_found = search_result.get("artists", {}).get("items", [])
-        except Exception as e:
-            logger.warning(f"Spotify search failed for '{primary_artist}': {e}")
-            artists_found = []
-
-        if artists_found:
-            best_match = artists_found[0]
+        # Search Spotify using three-stage logic (exact -> tribute fallback -> raw)
+        sp_artist = await _find_spotify_artist(access_token, primary_artist)
+        if sp_artist:
             if not artist_genres:
-                artist_genres = best_match.get("genres", [])
+                artist_genres = sp_artist.get("genres", [])
             if not spotify_popularity:
-                spotify_popularity = best_match.get("popularity")
-            spotify_artist_url = best_match.get("external_urls", {}).get("spotify", "")
+                spotify_popularity = sp_artist.get("popularity")
+            spotify_artist_url = sp_artist.get("external_urls", {}).get("spotify", "")
 
         # Compute genre match score
         score, matched_terms, explanation = compute_genre_match_score(
