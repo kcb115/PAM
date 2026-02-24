@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Music, LogOut, RefreshCw, Share2, Heart, Search, Copy, Check } from "lucide-react";
+import { Music, LogOut, RefreshCw, Share2, Heart, Search, Copy, Check, ChevronDown, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
@@ -24,6 +24,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
   const [totalScanned, setTotalScanned] = useState(0);
   const [shareUrl, setShareUrl] = useState("");
   const [copied, setCopied] = useState(false);
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("discover");
   const [sessionId, setSessionId] = useState(() =>
     localStorage.getItem("pam_session_id") || ""
@@ -160,19 +161,29 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
     }
   };
 
-  const handleShare = async () => {
+  const handleShareResults = async () => {
     if (!user?.id) return;
+    setShareMenuOpen(false);
     try {
       const res = await api.createShare(user.id);
       const url = `${window.location.origin}/share/${res.data.share_id}`;
       setShareUrl(url);
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      toast.success("Share link copied to clipboard!");
+      toast.success("Results link copied to clipboard!");
       setTimeout(() => setCopied(false), 3000);
     } catch (err) {
       toast.error("Failed to generate share link");
     }
+  };
+
+  const handleShareLanding = async () => {
+    setShareMenuOpen(false);
+    const url = window.location.origin;
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    toast.success("PAM link copied to clipboard!");
+    setTimeout(() => setCopied(false), 3000);
   };
 
   const handleLogout = () => {
@@ -213,16 +224,55 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
 
           <div className="flex items-center gap-3">
             {tasteProfile && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleShare}
-                className="text-zinc-500 hover:text-[#DED5EB] text-xs font-mono"
-                data-testid="share-btn"
-              >
-                {copied ? <Check className="w-4 h-4 mr-1" /> : <Share2 className="w-4 h-4 mr-1" />}
-                {copied ? "Copied!" : "Share"}
-              </Button>
+              <div className="relative" data-testid="share-menu-wrapper">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShareMenuOpen((prev) => !prev)}
+                  className="text-zinc-500 hover:text-[#DED5EB] text-xs font-mono"
+                  data-testid="share-btn"
+                >
+                  {copied ? <Check className="w-4 h-4 mr-1" /> : <Share2 className="w-4 h-4 mr-1" />}
+                  {copied ? "Copied!" : "Share"}
+                  <ChevronDown className="w-3 h-3 ml-1" />
+                </Button>
+                {shareMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShareMenuOpen(false)}
+                    />
+                    <div
+                      className="absolute right-0 mt-2 w-56 bg-zinc-900 border border-white/10 rounded-xl overflow-hidden z-50 shadow-xl"
+                      data-testid="share-dropdown"
+                    >
+                      <button
+                        onClick={handleShareResults}
+                        className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                        data-testid="share-results-btn"
+                      >
+                        <Share2 className="w-4 h-4 mt-0.5 text-[#DED5EB] shrink-0" />
+                        <div>
+                          <p className="text-xs font-syne font-bold text-[#DED5EB]">Share my results</p>
+                          <p className="text-xs text-zinc-500 mt-0.5">Friends see your taste profile</p>
+                        </div>
+                      </button>
+                      <div className="border-t border-white/5" />
+                      <button
+                        onClick={handleShareLanding}
+                        className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                        data-testid="share-landing-btn"
+                      >
+                        <Users className="w-4 h-4 mt-0.5 text-[#DED5EB] shrink-0" />
+                        <div>
+                          <p className="text-xs font-syne font-bold text-[#DED5EB]">Share for friends to explore</p>
+                          <p className="text-xs text-zinc-500 mt-0.5">Send friends to PAM to try it</p>
+                        </div>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
             {user && (
               <span className="text-xs font-mono text-zinc-500 hidden sm:block" data-testid="user-greeting">
