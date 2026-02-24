@@ -396,7 +396,7 @@ async def create_share(user_id: str = Query(...)):
         profile.get("genre_map", {}).items(),
         key=lambda x: x[1],
         reverse=True,
-    )[:8]
+    )[:20]
 
     share_doc = {
         "share_id": share_id,
@@ -406,6 +406,7 @@ async def create_share(user_id: str = Query(...)):
         "root_genre_map": profile.get("root_genre_map", {}),
         "audio_features": profile.get("audio_features", {}),
         "top_artist_count": len(profile.get("top_artist_ids", [])),
+        "top_artist_names": profile.get("top_artist_names", [])[:15],
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
