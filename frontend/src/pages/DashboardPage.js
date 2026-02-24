@@ -166,7 +166,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
     setShareMenuOpen(false);
     try {
       const res = await api.createShare(user.id);
-      const url = `${process.env.PUBLIC_URL}/share/${res.data.share_id}`;
+      const url = `${window.location.origin}${process.env.PUBLIC_URL}/share/${res.data.share_id}`;
       setShareUrl(url);
       await navigator.clipboard.writeText(url);
       setCopied(true);
@@ -179,7 +179,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
 
   const handleShareLanding = async () => {
     setShareMenuOpen(false);
-    const url = process.env.PUBLIC_URL || window.location.origin;
+    const url = `${window.location.origin}${process.env.PUBLIC_URL}`;
     await navigator.clipboard.writeText(url);
     setCopied(true);
     toast.success("PAM link copied to clipboard!");
