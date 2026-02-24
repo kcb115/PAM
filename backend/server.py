@@ -403,6 +403,7 @@ async def create_share(user_id: str = Query(...)):
         "user_id": user_id,
         "user_name": user.get("name", "Anonymous"),
         "top_genres": [g[0] for g in top_genres],
+        "genre_map": {g[0]: g[1] for g in top_genres},
         "root_genre_map": profile.get("root_genre_map", {}),
         "audio_features": profile.get("audio_features", {}),
         "top_artist_count": len(profile.get("top_artist_ids", [])),
