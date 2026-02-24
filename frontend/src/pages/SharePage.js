@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,172 +8,158 @@ import { api } from "@/lib/api";
 
 // ─── Music Note Word Cloud ────────────────────────────────────────────────────
 
-function MusicNoteWordCloud({ genreMap, fallbackGenres }) {
-  const [words, setWords] = useState([]);
-  const SIZE = 380;
+function MusicNoteWordCloud({ genres, genreMap }) {
+  const canvasRef = useRef(null);
+  const W = 520;
+  const H = 420;
 
   useEffect(() => {
-    // Build genre list from map (weighted) or fallback array (equal weight)
-    let entries = [];
-    if (genreMap && Object.keys(genreMap).length > 0) {
-      entries = Object.entries(genreMap)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 22);
-    } else if (fallbackGenres?.length) {
-      entries = fallbackGenres.map((g, i) => [g, 1 - i * 0.05]);
-    }
-    if (!entries.length) return;
-
-    // Draw a bold double eighth note on an offscreen canvas
-    const canvas = document.createElement("canvas");
-    canvas.width = SIZE;
-    canvas.height = SIZE;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "white";
+    ctx.clearRect(0, 0, W, H);
+
+    // Build sorted genre list — use specific genres array, weight from genreMap if available
+    if (!genres?.length) return;
+    const maxW = genreMap ? Math.max(...Object.values(genreMap), 0.01) : 1;
+    const entries = genres.map((g, i) => {
+      const root = Object.keys(genreMap || {}).find((r) =>
+        g.toLowerCase().includes(r.toLowerCase())
+      );
+      const weight = root ? (genreMap[root] / maxW) : Math.max(0.2, 1 - i * 0.04);
+      return { word: g, weight };
+    });
+
+    // ── Draw music note mask shape ──────────────────────────────────────
+    const noteCanvas = document.createElement("canvas");
+    noteCanvas.width = W;
+    noteCanvas.height = H;
+    const nc = noteCanvas.getContext("2d");
+    nc.fillStyle = "white";
+
+    // Scale note to fit W×H canvas
+    const sx = W / 380;
+    const sy = H / 380;
 
     // Note head 1 — lower left
-    ctx.save();
-    ctx.translate(102, 298);
-    ctx.rotate(-0.32);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 60, 43, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    nc.save(); nc.translate(102 * sx, 298 * sy); nc.rotate(-0.32);
+    nc.beginPath(); nc.ellipse(0, 0, 60 * sx, 43 * sy, 0, 0, Math.PI * 2); nc.fill();
+    nc.restore();
 
     // Note head 2 — lower right
-    ctx.save();
-    ctx.translate(258, 258);
-    ctx.rotate(-0.32);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 60, 43, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    nc.save(); nc.translate(258 * sx, 258 * sy); nc.rotate(-0.32);
+    nc.beginPath(); nc.ellipse(0, 0, 60 * sx, 43 * sy, 0, 0, Math.PI * 2); nc.fill();
+    nc.restore();
 
-    // Stem 1 — left
-    ctx.fillRect(143, 88, 20, 215);
+    // Stem 1
+    nc.fillRect(143 * sx, 88 * sy, 20 * sx, 215 * sy);
+    // Stem 2
+    nc.fillRect(298 * sx, 52 * sy, 20 * sx, 210 * sy);
+    // Beam
+    nc.beginPath();
+    nc.moveTo(143 * sx, 88 * sy);
+    nc.lineTo(318 * sx, 52 * sy);
+    nc.lineTo(318 * sx, 84 * sy);
+    nc.lineTo(143 * sx, 120 * sy);
+    nc.closePath();
+    nc.fill();
 
-    // Stem 2 — right
-    ctx.fillRect(298, 52, 20, 210);
-
-    // Top beam
-    ctx.beginPath();
-    ctx.moveTo(143, 88);
-    ctx.lineTo(318, 52);
-    ctx.lineTo(318, 84);
-    ctx.lineTo(143, 120);
-    ctx.closePath();
-    ctx.fill();
-
-    // Scan valid cells (CELL x CELL pixel blocks inside the note)
-    const CELL = 10;
-    const cols = Math.ceil(SIZE / CELL);
-    const rows = Math.ceil(SIZE / CELL);
-    const imgData = ctx.getImageData(0, 0, SIZE, SIZE).data;
-
-    const isValid = (col, row) => {
-      const px = col * CELL + Math.floor(CELL / 2);
-      const py = row * CELL + Math.floor(CELL / 2);
-      if (px >= SIZE || py >= SIZE) return false;
-      return imgData[(py * SIZE + px) * 4 + 3] > 128;
+    const maskData = noteCanvas.getContext("2d").getImageData(0, 0, W, H).data;
+    const inMask = (x, y) => {
+      if (x < 0 || y < 0 || x >= W || y >= H) return false;
+      return maskData[(Math.round(y) * W + Math.round(x)) * 4 + 3] > 128;
     };
 
-    const validSet = new Set();
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (isValid(c, r)) validSet.add(`${c},${r}`);
-      }
-    }
-
-    // Shuffle valid cells for random placement
-    const validList = Array.from(validSet);
-    for (let i = validList.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [validList[i], validList[j]] = [validList[j], validList[i]];
-    }
-
-    const maxWeight = entries[0]?.[1] || 1;
-    const colors = [
-      "#ffffff", "#ffffff", "#DED5EB", "#DED5EB",
-      "#c4b5fd", "#c4b5fd", "#a78bfa", "#a78bfa",
-      "#8b5cf6", "#7c3aed", "#6d28d9", "#5b21b6",
+    // ── Place words on the note canvas ──────────────────────────────────
+    const FONT = "bold {sz}px 'JetBrains Mono', monospace";
+    const COLORS = [
+      "#ffffff","#ffffff","#DED5EB","#DED5EB",
+      "#c4b5fd","#c4b5fd","#a78bfa","#a78bfa",
+      "#8b5cf6","#7c3aed","#6d28d9","#5b21b6",
     ];
+    const PAD = 3; // px padding between words
 
-    const occupied = new Set();
-    const placed = [];
+    // Occupied pixel map (coarse 2px grid for speed)
+    const GRID = 2;
+    const gW = Math.ceil(W / GRID);
+    const gH = Math.ceil(H / GRID);
+    const occupied = new Uint8Array(gW * gH);
 
-    entries.forEach(([genre, weight], i) => {
-      const normalized = weight / maxWeight;
-      // Font size range: 11px (min) to 28px (max)
-      const fontSize = Math.round(11 + normalized * 17);
-      // Approximate word bounding box in cells
-      const charW = fontSize * 0.58;
-      const wordCols = Math.ceil((genre.length * charW) / CELL) + 1;
-      const wordRows = Math.ceil((fontSize * 1.4) / CELL) + 1;
-      const color = colors[Math.min(i, colors.length - 1)];
+    const markOccupied = (x1, y1, x2, y2) => {
+      const gx1 = Math.max(0, Math.floor((x1 - PAD) / GRID));
+      const gy1 = Math.max(0, Math.floor((y1 - PAD) / GRID));
+      const gx2 = Math.min(gW - 1, Math.ceil((x2 + PAD) / GRID));
+      const gy2 = Math.min(gH - 1, Math.ceil((y2 + PAD) / GRID));
+      for (let gy = gy1; gy <= gy2; gy++)
+        for (let gx = gx1; gx <= gx2; gx++)
+          occupied[gy * gW + gx] = 1;
+    };
 
-      for (const cellKey of validList) {
-        const [c, r] = cellKey.split(",").map(Number);
-        // Check all cells the word would occupy
-        let fits = true;
-        const needed = [];
-        for (let dc = 0; dc < wordCols && fits; dc++) {
-          for (let dr = 0; dr < wordRows && fits; dr++) {
-            const k = `${c + dc},${r + dr}`;
-            if (!validSet.has(k) || occupied.has(k)) {
-              fits = false;
-            } else {
-              needed.push(k);
-            }
-          }
-        }
-        if (fits) {
-          needed.forEach((k) => occupied.add(k));
-          placed.push({
-            word: genre,
-            x: c * CELL,
-            y: r * CELL,
-            fontSize,
-            color,
-          });
+    const isClear = (x1, y1, x2, y2) => {
+      const gx1 = Math.max(0, Math.floor((x1 - PAD) / GRID));
+      const gy1 = Math.max(0, Math.floor((y1 - PAD) / GRID));
+      const gx2 = Math.min(gW - 1, Math.ceil((x2 + PAD) / GRID));
+      const gy2 = Math.min(gH - 1, Math.ceil((y2 + PAD) / GRID));
+      for (let gy = gy1; gy <= gy2; gy++)
+        for (let gx = gx1; gx <= gx2; gx++)
+          if (occupied[gy * gW + gx]) return false;
+      return true;
+    };
+
+    const wordsFitInMask = (x1, y1, x2, y2) => {
+      // Sample corners + midpoints
+      const pts = [
+        [x1, y1],[x2, y1],[x1, y2],[x2, y2],
+        [(x1+x2)/2, y1],[(x1+x2)/2, y2],
+      ];
+      return pts.every(([px, py]) => inMask(px, py));
+    };
+
+    // Try placing each word with random spiral search
+    entries.forEach(({ word, weight }, i) => {
+      const fontSize = Math.round(10 + weight * 16);
+      const font = FONT.replace("{sz}", fontSize);
+      ctx.font = font;
+      const metrics = ctx.measureText(word.toUpperCase() === word ? word : word);
+      const tw = metrics.width;
+      const th = fontSize * 1.3;
+      const color = COLORS[Math.min(i, COLORS.length - 1)];
+
+      // Try up to 300 random positions biased towards note body
+      const candidates = [];
+      for (let t = 0; t < 300; t++) {
+        const x = Math.random() * (W - tw);
+        const y = Math.random() * (H - th);
+        candidates.push([x, y]);
+      }
+
+      for (const [x, y] of candidates) {
+        const x2 = x + tw;
+        const y2 = y + th;
+        if (wordsFitInMask(x, y, x2, y2) && isClear(x, y, x2, y2)) {
+          ctx.fillStyle = color;
+          ctx.font = font;
+          ctx.textBaseline = "top";
+          ctx.fillText(word, x, y);
+          markOccupied(x, y, x2, y2);
           break;
         }
       }
     });
 
-    setWords(placed);
-  }, [genreMap, fallbackGenres]);
+    // ── Apply note shape as mask ────────────────────────────────────────
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.drawImage(noteCanvas, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+  }, [genres, genreMap]);
 
   return (
-    <div
-      style={{
-        position: "relative",
-        width: SIZE,
-        height: SIZE,
-        margin: "0 auto",
-      }}
-    >
-      {words.map(({ word, x, y, fontSize, color }) => (
-        <span
-          key={word}
-          style={{
-            position: "absolute",
-            left: x,
-            top: y,
-            fontSize,
-            color,
-            fontFamily: "'JetBrains Mono', monospace",
-            fontWeight: "bold",
-            textTransform: "capitalize",
-            whiteSpace: "nowrap",
-            lineHeight: 1.4,
-            userSelect: "none",
-            textShadow: "0 1px 6px rgba(0,0,0,0.6)",
-          }}
-        >
-          {word}
-        </span>
-      ))}
-    </div>
+    <canvas
+      ref={canvasRef}
+      width={W}
+      height={H}
+      style={{ maxWidth: "100%", display: "block", margin: "0 auto" }}
+    />
   );
 }
 
@@ -281,8 +267,8 @@ export default function SharePage() {
               Genre DNA
             </p>
             <MusicNoteWordCloud
+              genres={share.top_genres || []}
               genreMap={share.root_genre_map}
-              fallbackGenres={share.top_genres}
             />
           </div>
 
