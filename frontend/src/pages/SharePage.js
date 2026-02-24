@@ -148,6 +148,38 @@ function MusicNoteWordCloud({ genreMap }) {
     ctx.globalCompositeOperation = "destination-in";
     ctx.drawImage(noteCanvas, 0, 0);
     ctx.globalCompositeOperation = "source-over";
+
+    // ── Draw note outline on top ────────────────────────────────────────
+    const oc = noteCanvas.getContext("2d");
+    oc.clearRect(0, 0, W, H);
+    oc.strokeStyle = "#5b21b6";
+    oc.lineWidth = 2.5;
+    oc.lineJoin = "round";
+
+    // Note head 1 outline
+    oc.save(); oc.translate(102 * sx, 298 * sy); oc.rotate(-0.32);
+    oc.beginPath(); oc.ellipse(0, 0, 60 * sx, 43 * sy, 0, 0, Math.PI * 2); oc.stroke();
+    oc.restore();
+
+    // Note head 2 outline
+    oc.save(); oc.translate(258 * sx, 258 * sy); oc.rotate(-0.32);
+    oc.beginPath(); oc.ellipse(0, 0, 60 * sx, 43 * sy, 0, 0, Math.PI * 2); oc.stroke();
+    oc.restore();
+
+    // Stem 1 outline
+    oc.strokeRect(143 * sx, 88 * sy, 20 * sx, 215 * sy);
+    // Stem 2 outline
+    oc.strokeRect(298 * sx, 52 * sy, 20 * sx, 210 * sy);
+    // Beam outline
+    oc.beginPath();
+    oc.moveTo(143 * sx, 88 * sy);
+    oc.lineTo(318 * sx, 52 * sy);
+    oc.lineTo(318 * sx, 84 * sy);
+    oc.lineTo(143 * sx, 120 * sy);
+    oc.closePath();
+    oc.stroke();
+
+    ctx.drawImage(noteCanvas, 0, 0);
   }, [genreMap]);
 
   return (
