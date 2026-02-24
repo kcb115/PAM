@@ -148,7 +148,7 @@ function MusicNoteWordCloud({ genreMap }) {
     ctx.globalCompositeOperation = "destination-in";
     ctx.drawImage(noteCanvas, 0, 0);
     ctx.globalCompositeOperation = "source-over";
-  }, [genres, genreMap]);
+  }, [genreMap]);
 
   return (
     <canvas
