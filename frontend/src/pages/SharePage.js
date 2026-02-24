@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 
 // ─── Music Note Word Cloud ────────────────────────────────────────────────────
 
-function MusicNoteWordCloud({ genres, genreMap }) {
+function MusicNoteWordCloud({ genreMap }) {
   const canvasRef = useRef(null);
   const W = 520;
   const H = 420;
@@ -19,16 +19,12 @@ function MusicNoteWordCloud({ genres, genreMap }) {
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, W, H);
 
-    // Build sorted genre list — use specific genres array, weight from genreMap if available
-    if (!genres?.length) return;
-    const maxW = genreMap ? Math.max(...Object.values(genreMap), 0.01) : 1;
-    const entries = genres.map((g, i) => {
-      const root = Object.keys(genreMap || {}).find((r) =>
-        g.toLowerCase().includes(r.toLowerCase())
-      );
-      const weight = root ? (genreMap[root] / maxW) : Math.max(0.2, 1 - i * 0.04);
-      return { word: g, weight };
-    });
+    const entries = Object.entries(genreMap || {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 22);
+    if (!entries.length) return;
+
+    const maxW = entries[0][1];
 
     // ── Draw music note mask shape ──────────────────────────────────────
     const noteCanvas = document.createElement("canvas");
@@ -116,7 +112,8 @@ function MusicNoteWordCloud({ genres, genreMap }) {
     };
 
     // Try placing each word with random spiral search
-    entries.forEach(({ word, weight }, i) => {
+    entries.forEach(([word, rawWeight], i) => {
+      const weight = rawWeight / maxW;
       const fontSize = Math.round(10 + weight * 16);
       const font = FONT.replace("{sz}", fontSize);
       ctx.font = font;
@@ -267,8 +264,7 @@ export default function SharePage() {
               Genre DNA
             </p>
             <MusicNoteWordCloud
-              genres={share.top_genres || []}
-              genreMap={share.root_genre_map}
+              genreMap={share.genre_map || share.root_genre_map || {}}
             />
           </div>
 
