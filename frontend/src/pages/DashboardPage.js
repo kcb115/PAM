@@ -166,7 +166,7 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
     setShareMenuOpen(false);
     try {
       const res = await api.createShare(user.id);
-      const url = `${window.location.origin}${process.env.PUBLIC_URL}/share/${res.data.share_id}`;
+      const url = `${window.location.origin}${process.env.PUBLIC_URL}/#/share/${res.data.share_id}`;
       setShareUrl(url);
       await navigator.clipboard.writeText(url);
       setCopied(true);
