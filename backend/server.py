@@ -60,6 +60,8 @@ async def create_user(data: UserCreate):
     user = User(
         name=data.name,
         email=data.email,
+        phone_number=data.phone_number,
+        sms_consent=data.sms_consent,
         city=data.city,
         concerts_per_month=data.concerts_per_month,
         ticket_budget=data.ticket_budget,
@@ -468,4 +470,4 @@ app.add_middleware(
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    client.close(
