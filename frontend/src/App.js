@@ -5,6 +5,8 @@ import LandingPage from "@/pages/LandingPage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import DashboardPage from "@/pages/DashboardPage";
 import SharePage from "@/pages/SharePage";
+import TermsPage from "@/pages/TermsPage";
+import PrivacyPage from "@/pages/PrivacyPage";
 import { Toaster } from "@/components/ui/sonner";
 
 function App() {
@@ -45,6 +47,8 @@ function App() {
             }
           />
           <Route path="/share/:shareId" element={<SharePage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
         </Routes>
       </HashRouter>
     </div>
