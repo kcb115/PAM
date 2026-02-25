@@ -7,6 +7,8 @@ import uuid
 class UserCreate(BaseModel):
     name: str
     email: str
+    phone_number: str
+    sms_consent: bool = False
     city: Optional[str] = None
     concerts_per_month: int = 2
     ticket_budget: float = 50.0
@@ -17,6 +19,8 @@ class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     email: str
+    phone_number: Optional[str] = None
+    sms_consent: bool = False
     concerts_per_month: int = 2
     ticket_budget: float = 50.0
     spotify_connected: bool = False
@@ -29,6 +33,8 @@ class User(BaseModel):
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
+    phone_number: Optional[str] = None
+    sms_consent: Optional[bool] = None
     concerts_per_month: Optional[int] = None
     ticket_budget: Optional[float] = None
     city: Optional[str] = None
