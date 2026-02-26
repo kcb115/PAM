@@ -2,8 +2,10 @@
 Taste Profile Builder.
 Aggregates genre tags from Spotify data to create a user's genre summary.
 Uses raw Spotify genre strings without simplification.
+Generates an AI-powered narrative description of the listener's taste.
 """
 import logging
+import os
 from collections import defaultdict
 from models import TasteProfile, AudioFeatures
 import spotify_service
@@ -24,6 +26,66 @@ def build_genre_map(artists_data: list, time_range_weight: float = 1.0) -> dict:
             genre_counts[genre.lower().strip()] += weight
 
     return dict(genre_counts)
+
+
+async def generate_narrative(
+    genre_map: dict,
+    top_artist_names: list,
+    audio_features: AudioFeatures,
+) -> str:
+    """Generate a 3-4 sentence narrative describing the listener's taste using Claude Haiku."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        logger.warning("ANTHROPIC_API_KEY not set. Skipping narrative generation.")
+        return ""
+
+    try:
+        import anthropic
+
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+
+        # Prepare the data payload: top 10 genres and top 10 artists
+        top_genres = list(genre_map.items())[:10]
+        genre_summary = ", ".join(
+            f"{genre} ({round(weight * 100)}%)" for genre, weight in top_genres
+        )
+        artist_summary = ", ".join(top_artist_names[:10])
+
+        features_summary = (
+            f"energy: {audio_features.energy:.2f}, "
+            f"danceability: {audio_features.danceability:.2f}, "
+            f"valence (mood): {audio_features.valence:.2f}, "
+            f"acousticness: {audio_features.acousticness:.2f}, "
+            f"instrumentalness: {audio_features.instrumentalness:.2f}, "
+            f"tempo: {audio_features.tempo:.0f} BPM"
+        )
+
+        prompt = (
+            "You are PAM, a concert discovery app that knows music deeply. "
+            "Based on this listener's Spotify data, write exactly 3-4 sentences "
+            "describing who they are as a listener. Speak directly to them in "
+            "second person (\"you\"). Be warm, specific, and insightful. Reference "
+            "specific genres and artists from the data naturally, not as a list. "
+            "Do NOT use generic filler. Every sentence should reveal something "
+            "meaningful about their taste. Do NOT use emojis or bullet points.\n\n"
+            f"Top genres (weighted): {genre_summary}\n"
+            f"Top artists: {artist_summary}\n"
+            f"Audio features: {features_summary}"
+        )
+
+        message = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        narrative = message.content[0].text.strip()
+        logger.info(f"Generated taste narrative ({len(narrative)} chars)")
+        return narrative
+
+    except Exception as e:
+        logger.error(f"Narrative generation failed: {e}")
+        return ""
 
 
 async def build_taste_profile(user_id: str, access_token: str) -> TasteProfile:
@@ -76,13 +138,18 @@ async def build_taste_profile(user_id: str, access_token: str) -> TasteProfile:
     top_artist_ids = list(all_artists.keys())
     top_artist_names = list(all_artists.values())
 
+    # Generate AI narrative
+    audio = AudioFeatures()
+    narrative = await generate_narrative(sorted_genres, top_artist_names, audio)
+
     profile = TasteProfile(
         user_id=user_id,
         genre_map=sorted_genres,
         root_genre_map=sorted_genres,
-        audio_features=AudioFeatures(),
+        audio_features=audio,
         top_artist_ids=top_artist_ids,
         top_artist_names=top_artist_names,
+        taste_narrative=narrative,
     )
 
     logger.info(f"Taste profile built: {len(sorted_genres)} genres, {len(top_artist_ids)} artists")
