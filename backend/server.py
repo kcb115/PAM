@@ -256,6 +256,22 @@ async def regenerate_narrative(user_id: str = Query(...)):
 @api_router.post("/concerts/discover")
 async def discover_concerts(data: DiscoverRequest):
     """Discover matching concerts near the user's location."""
+    # Validate date range: both dates required, max 31 days apart
+    if not data.date_from or not data.date_to:
+        raise HTTPException(status_code=400, detail="Both start and end dates are required.")
+    try:
+        dt_from = datetime.fromisoformat(data.date_from.replace("Z", "+00:00"))
+        dt_to = datetime.fromisoformat(data.date_to.replace("Z", "+00:00"))
+        if (dt_to - dt_from).days > 31:
+            raise HTTPException(
+                status_code=400,
+                detail="Date range cannot exceed 1 month. Please narrow your search.",
+            )
+        if dt_to < dt_from:
+            raise HTTPException(status_code=400, detail="End date must be after start date.")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format.")
+
     profile_doc = await db.taste_profiles.find_one({"user_id": data.user_id}, {"_id": 0})
     if not profile_doc:
         raise HTTPException(status_code=400, detail="Build your taste profile first")
@@ -351,7 +367,7 @@ async def discover_concerts(data: DiscoverRequest):
 
     # Step 4: Match and rank
     try:
-        concerts = await matching.match_and_rank_concerts(events, taste, access_token)
+        concerts = await matching.match_and_rank_concerts(events, taste, access_token, db=db)
     except Exception as e:
         logger.error(f"Matching failed: {e}")
         raise HTTPException(status_code=500, detail=f"Matching error: {str(e)}")
