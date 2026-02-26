@@ -16,15 +16,27 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 
 const RADIUS_OPTIONS = [10, 25, 50, 75, 100, 150];
+const MAX_RANGE_DAYS = 31;
 
 export const LocationSearch = ({ onSearch, loading, defaultCity, defaultRadius }) => {
   const [city, setCity] = useState(defaultCity || "");
   const [radius, setRadius] = useState(String(defaultRadius || 25));
   const [dateFrom, setDateFrom] = useState(null);
   const [dateTo, setDateTo] = useState(null);
+
+  const handleFromSelect = (date) => {
+    setDateFrom(date);
+    // If existing end date is now out of range, clear it
+    if (dateTo && date) {
+      const maxEnd = addDays(date, MAX_RANGE_DAYS);
+      if (dateTo > maxEnd || dateTo < date) {
+        setDateTo(null);
+      }
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -36,6 +48,13 @@ export const LocationSearch = ({ onSearch, loading, defaultCity, defaultRadius }
       dateFrom.toISOString(),
       dateTo.toISOString(),
     );
+  };
+
+  // End date constraints: must be >= dateFrom and <= dateFrom + 31 days
+  const disableEndDate = (date) => {
+    if (!dateFrom) return date < new Date();
+    const maxEnd = addDays(dateFrom, MAX_RANGE_DAYS);
+    return date < dateFrom || date > maxEnd;
   };
 
   return (
@@ -93,12 +112,15 @@ export const LocationSearch = ({ onSearch, loading, defaultCity, defaultRadius }
           </div>
 
           {/* Date range row */}
-          <div className="flex flex-col sm:flex-row gap-4 pt-2 border-t border-white/5">
+          <div className="flex flex-col gap-3 pt-2 border-t border-white/5">
             <div className="flex items-center gap-3 flex-wrap">
               <Label className="text-xs font-mono uppercase tracking-wider text-zinc-500 flex items-center gap-1.5 shrink-0">
                 <CalendarIcon className="w-3 h-3" /> Date Range
+                <span className="text-[#DED5EB]/60">(required, max 1 month)</span>
               </Label>
+            </div>
 
+            <div className="flex items-center gap-3 flex-wrap">
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -106,14 +128,14 @@ export const LocationSearch = ({ onSearch, loading, defaultCity, defaultRadius }
                     className={`bg-secondary/50 border-white/10 h-10 px-3 font-mono text-xs rounded-lg hover:text-white ${dateFrom ? "text-white" : "text-zinc-400"}`}
                     data-testid="date-from-btn"
                   >
-                    {dateFrom ? format(dateFrom, "MMM d, yyyy") : "Select start date"}
+                    {dateFrom ? format(dateFrom, "MMM d, yyyy") : "Start date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 bg-zinc-900 border-white/10" align="start">
                   <Calendar
                     mode="single"
                     selected={dateFrom}
-                    onSelect={setDateFrom}
+                    onSelect={handleFromSelect}
                     disabled={(date) => date < new Date()}
                     className="rounded-md"
                   />
@@ -129,7 +151,7 @@ export const LocationSearch = ({ onSearch, loading, defaultCity, defaultRadius }
                     className={`bg-secondary/50 border-white/10 h-10 px-3 font-mono text-xs rounded-lg hover:text-white ${dateTo ? "text-white" : "text-zinc-400"}`}
                     data-testid="date-to-btn"
                   >
-                    {dateTo ? format(dateTo, "MMM d, yyyy") : "Select end date"}
+                    {dateTo ? format(dateTo, "MMM d, yyyy") : "End date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 bg-zinc-900 border-white/10" align="start">
@@ -137,7 +159,7 @@ export const LocationSearch = ({ onSearch, loading, defaultCity, defaultRadius }
                     mode="single"
                     selected={dateTo}
                     onSelect={setDateTo}
-                    disabled={(date) => date < (dateFrom || new Date())}
+                    disabled={disableEndDate}
                     className="rounded-md"
                   />
                 </PopoverContent>
