@@ -59,6 +59,7 @@ class TasteProfile(BaseModel):
     audio_features: AudioFeatures = Field(default_factory=AudioFeatures)
     top_artist_ids: List[str] = []
     top_artist_names: List[str] = []
+    taste_narrative: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
