@@ -15,6 +15,10 @@ SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
 SPOTIFY_API_BASE = "https://api.spotify.com/v1"
 SCOPES = "user-top-read user-read-recently-played user-read-private"
 
+# Maximum seconds we are willing to wait on a Spotify rate-limit retry.
+# Anything beyond this and we fail gracefully instead of blocking the request.
+MAX_RETRY_SECONDS = 5
+
 
 def get_auth_url(state: str) -> str:
     params = {
@@ -81,12 +85,26 @@ async def _spotify_get(access_token: str, endpoint: str, params: dict = None) ->
         )
         if resp.status_code == 429:
             retry_after = int(resp.headers.get("Retry-After", 1))
-            logger.warning(f"Spotify rate limited. Retry after {retry_after}s")
-            import asyncio
-            await asyncio.sleep(retry_after)
-            return await _spotify_get(access_token, endpoint, params)
+            if retry_after <= MAX_RETRY_SECONDS:
+                logger.warning(f"Spotify rate limited. Retrying after {retry_after}s")
+                import asyncio
+                await asyncio.sleep(retry_after)
+                return await _spotify_get(access_token, endpoint, params)
+            else:
+                logger.warning(
+                    f"Spotify rate limited for {retry_after}s (>{MAX_RETRY_SECONDS}s cap). "
+                    "Skipping request."
+                )
+                raise SpotifyRateLimitError(retry_after)
         resp.raise_for_status()
         return resp.json()
+
+
+class SpotifyRateLimitError(Exception):
+    """Raised when Spotify rate limit exceeds our max retry threshold."""
+    def __init__(self, retry_after: int):
+        self.retry_after = retry_after
+        super().__init__(f"Spotify rate limited for {retry_after}s")
 
 
 async def get_user_profile(access_token: str) -> dict:
