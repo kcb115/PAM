@@ -86,6 +86,22 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
     }
   }, [sessionId, user?.id, tasteProfile, buildTasteProfile]);
 
+  const handleRegenerateNarrative = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const res = await api.regenerateNarrative(user.id);
+      setTasteProfile((prev) => ({
+        ...prev,
+        taste_narrative: res.data.taste_narrative,
+      }));
+      toast.success("Listening identity refreshed!");
+    } catch (err) {
+      console.error(err);
+      const msg = err.response?.data?.detail || "Failed to regenerate narrative";
+      toast.error(msg);
+    }
+  }, [user?.id]);
+
   const handleDiscover = async (city, radius, dateFrom, dateTo) => {
     if (!user?.id) return;
     if (!tasteProfile) {
@@ -330,7 +346,10 @@ export default function DashboardPage({ user, onSaveUser, onLogout }) {
 
           {tasteProfile ? (
   <>
-    <TasteProfileCard profile={tasteProfile} />
+    <TasteProfileCard
+      profile={tasteProfile}
+      onRegenerateNarrative={handleRegenerateNarrative}
+    />
     <TopArtistsCard artists={tasteProfile.top_artist_names || []} />
   </>
 ) : !loading ? (
