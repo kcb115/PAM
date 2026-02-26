@@ -11,7 +11,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 from models import (
-    User, UserCreate, UserUpdate, TasteProfile,
+    User, UserCreate, UserUpdate, TasteProfile, AudioFeatures,
     DiscoverRequest, DiscoverResponse, FavoriteCreate, Favorite,
 )
 import spotify_service
@@ -227,6 +227,31 @@ async def get_taste_profile(user_id: str):
     return profile
 
 
+@api_router.post("/taste-profile/regenerate-narrative")
+async def regenerate_narrative(user_id: str = Query(...)):
+    """Regenerate only the AI narrative for an existing taste profile."""
+    profile_doc = await db.taste_profiles.find_one({"user_id": user_id}, {"_id": 0})
+    if not profile_doc:
+        raise HTTPException(status_code=404, detail="Taste profile not found. Build one first.")
+
+    genre_map = profile_doc.get("genre_map", {})
+    top_artist_names = profile_doc.get("top_artist_names", [])
+    audio_raw = profile_doc.get("audio_features", {})
+    audio = AudioFeatures(**audio_raw) if isinstance(audio_raw, dict) else AudioFeatures()
+
+    narrative = await tp.generate_narrative(genre_map, top_artist_names, audio)
+
+    if not narrative:
+        raise HTTPException(status_code=500, detail="Narrative generation failed. Check API key.")
+
+    await db.taste_profiles.update_one(
+        {"user_id": user_id},
+        {"$set": {"taste_narrative": narrative}},
+    )
+
+    return {"taste_narrative": narrative}
+
+
 # ─── Concert Discovery ───────────────────────────────────
 @api_router.post("/concerts/discover")
 async def discover_concerts(data: DiscoverRequest):
@@ -410,6 +435,7 @@ async def create_share(user_id: str = Query(...)):
         "audio_features": profile.get("audio_features", {}),
         "top_artist_count": len(profile.get("top_artist_ids", [])),
         "top_artist_names": profile.get("top_artist_names", [])[:15],
+        "taste_narrative": profile.get("taste_narrative", ""),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
