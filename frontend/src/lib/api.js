@@ -17,6 +17,8 @@ export const api = {
   buildTasteProfile: (sessionId, userId) =>
     axios.post(`${API}/taste-profile/build?session_id=${sessionId}&user_id=${userId}`),
   getTasteProfile: (userId) => axios.get(`${API}/taste-profile/${userId}`),
+  regenerateNarrative: (userId) =>
+    axios.post(`${API}/taste-profile/regenerate-narrative?user_id=${userId}`),
 
   // Concert Discovery
   discoverConcerts: (data) => axios.post(`${API}/concerts/discover`, data),
