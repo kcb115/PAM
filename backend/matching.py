@@ -4,15 +4,21 @@ Direct genre string matching + ranking algorithm.
 
 Compares raw Spotify genre tags from concert artists against
 the user's genre profile without any simplification.
+
+Caches Spotify artist lookups in MongoDB to avoid rate limits.
 """
 import logging
 import re
+from datetime import datetime, timezone, timedelta
 from difflib import SequenceMatcher
 from typing import List, Dict, Optional
 from models import TasteProfile, ConcertMatch
 import spotify_service
 
 logger = logging.getLogger(__name__)
+
+# How long cached artist lookups remain valid before re-fetching
+CACHE_TTL_DAYS = 30
 
 # Patterns that indicate a tribute or cover band, and how to extract the original artist name
 TRIBUTE_PATTERNS = [
@@ -39,13 +45,56 @@ def _extract_tribute_target(artist_name: str) -> Optional[str]:
     return None
 
 
-async def _find_spotify_artist(access_token: str, artist_name: str) -> dict:
+async def _get_cached_artist(db, artist_name: str) -> Optional[dict]:
+    """Check MongoDB cache for a previously looked-up artist."""
+    if db is None:
+        return None
+    cache_key = artist_name.lower().strip()
+    doc = await db.spotify_artist_cache.find_one({"cache_key": cache_key}, {"_id": 0})
+    if not doc:
+        return None
+    # Check TTL
+    cached_at = doc.get("cached_at", "")
+    if cached_at:
+        try:
+            cached_dt = datetime.fromisoformat(cached_at)
+            if datetime.now(timezone.utc) - cached_dt > timedelta(days=CACHE_TTL_DAYS):
+                return None  # Expired
+        except (ValueError, TypeError):
+            return None
+    return doc.get("artist_data")
+
+
+async def _set_cached_artist(db, artist_name: str, artist_data: dict):
+    """Store a Spotify artist lookup result in MongoDB cache."""
+    if db is None:
+        return
+    cache_key = artist_name.lower().strip()
+    await db.spotify_artist_cache.update_one(
+        {"cache_key": cache_key},
+        {"$set": {
+            "cache_key": cache_key,
+            "artist_data": artist_data,
+            "cached_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+
+
+async def _find_spotify_artist(access_token: str, artist_name: str, db=None) -> dict:
     """
-    Spotify artist lookup with tribute/cover fallback.
-    1. Search by artist name, pick best fuzzy match from top 5 results.
-    2. If no good match, check for tribute/cover keywords and search for the original artist.
+    Spotify artist lookup with cache and tribute/cover fallback.
+    1. Check MongoDB cache first.
+    2. Search by artist name, pick best fuzzy match from top 5 results.
+    3. If no good match, check for tribute/cover keywords and search for the original artist.
+    4. Cache the result.
     Always returns the best available result, or {} if Spotify is unreachable.
     """
+    # Check cache first
+    cached = await _get_cached_artist(db, artist_name)
+    if cached is not None:
+        return cached
+
     search_name = artist_name
 
     async def _search(name: str) -> dict:
@@ -57,6 +106,9 @@ async def _find_spotify_artist(access_token: str, artist_name: str) -> dict:
             # Pick the candidate whose name is closest to what we searched for
             best = max(candidates, key=lambda a: _name_similarity(a.get("name", ""), name))
             return best
+        except spotify_service.SpotifyRateLimitError:
+            logger.warning(f"Rate limited during search for '{name}'. Skipping.")
+            return {}
         except Exception as e:
             logger.warning(f"Spotify search failed for '{name}': {e}")
             return {}
@@ -64,6 +116,7 @@ async def _find_spotify_artist(access_token: str, artist_name: str) -> dict:
     # Primary search
     result = await _search(search_name)
     if result and _name_similarity(result.get("name", ""), search_name) >= 0.6:
+        await _set_cached_artist(db, artist_name, result)
         return result
 
     # Tribute/cover fallback - search for the original artist instead
@@ -72,10 +125,13 @@ async def _find_spotify_artist(access_token: str, artist_name: str) -> dict:
         tribute_result = await _search(original)
         if tribute_result:
             logger.info(f"Tribute fallback: '{artist_name}' -> '{tribute_result.get('name')}'")
+            await _set_cached_artist(db, artist_name, tribute_result)
             return tribute_result
 
-    # Return whatever the primary search found, even if similarity was low
-    return result
+    # Cache whatever we got (even empty) to avoid re-searching
+    final = result or {}
+    await _set_cached_artist(db, artist_name, final)
+    return final
 
 
 def compute_genre_match_score(
@@ -147,13 +203,16 @@ async def match_and_rank_concerts(
     events: List[dict],
     taste_profile: TasteProfile,
     access_token: str,
+    db=None,
 ) -> List[ConcertMatch]:
     """
     Match and rank concert events against user's taste profile.
     Handles both external API events and Spotify-discovered events.
+    Uses MongoDB cache to minimize Spotify API calls.
     """
     results = []
     known_artist_names_lower = {n.lower() for n in taste_profile.top_artist_names}
+    rate_limited = False
 
     # Use root_genre_map (which now contains the raw Spotify genres)
     user_genre_map = taste_profile.root_genre_map
@@ -174,8 +233,13 @@ async def match_and_rank_concerts(
         spotify_popularity = event.get("popularity")
         spotify_artist_url = event.get("spotify_artist_url", "")
 
-        # Search Spotify using three-stage logic (exact -> tribute fallback -> raw)
-        sp_artist = await _find_spotify_artist(access_token, primary_artist)
+        # Search Spotify (cache-first, skips API if rate limited)
+        if not rate_limited:
+            sp_artist = await _find_spotify_artist(access_token, primary_artist, db=db)
+        else:
+            # Still check cache even when rate limited
+            sp_artist = await _get_cached_artist(db, primary_artist) or {}
+
         if sp_artist:
             if not artist_genres:
                 artist_genres = sp_artist.get("genres", [])
