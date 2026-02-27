@@ -6,6 +6,7 @@ Generates an AI-powered narrative description of the listener's taste.
 """
 import logging
 import os
+import re
 from collections import defaultdict
 from models import TasteProfile, AudioFeatures
 import spotify_service
@@ -65,9 +66,11 @@ async def generate_narrative(
             "Based on this listener's Spotify data, write exactly 3-4 sentences "
             "describing who they are as a listener. Speak directly to them in "
             "second person (\"you\"). Be warm, specific, and insightful. Reference "
-            "specific genres and artists from the data naturally, not as a list. "
-            "Do NOT use generic filler. Every sentence should reveal something "
-            "meaningful about their taste. Do NOT use emojis or bullet points.\n\n"
+            "specific genres from the data naturally, not as a list or name any "
+            "artists, but allude to them. Do NOT use generic filler. Every sentence "
+            "should reveal something meaningful about their taste. Do NOT use "
+            "emojis, bullet points, headers, titles, em dashes or any markdown "
+            "formatting. Start directly with the first sentence of the narrative.\n\n"
             f"Top genres (weighted): {genre_summary}\n"
             f"Top artists: {artist_summary}\n"
             f"Audio features: {features_summary}"
@@ -80,6 +83,11 @@ async def generate_narrative(
         )
 
         narrative = message.content[0].text.strip()
+
+        # Strip any markdown headers or titles the model may have prepended
+        narrative = re.sub(r"^#+\s*.*?\n+", "", narrative).strip()
+        narrative = re.sub(r"^\*\*.*?\*\*\s*\n*", "", narrative).strip()
+
         logger.info(f"Generated taste narrative ({len(narrative)} chars)")
         return narrative
 
