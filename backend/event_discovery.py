@@ -5,6 +5,10 @@ then generates concert-like event listings.
 
 When a real events API (Jambase/Ticketmaster) is available,
 this module can be bypassed in favor of real event data.
+
+Now applies the same 2-stage pipeline as the main discovery path:
+  Stage 1: rank discovered artists by tag overlap (cheap, no Spotify calls)
+  Stage 2: enrich only the top candidates via Spotify, cap at MAX_SHOWS_PER_CITY
 """
 import logging
 import random
@@ -13,6 +17,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Dict
 import spotify_service
 import musicbrainz_service
+from matching import MAX_SHOWS_PER_CITY, PREFILTER_CANDIDATES_PER_CITY
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +156,31 @@ def _generate_event_dates(count: int, date_from: str = None, date_to: str = None
     return dates
 
 
+def _cheap_tag_score(
+    artist_tags: List[str],
+    root_genre_map: Dict[str, float],
+) -> float:
+    """
+    Stage 1 scoring for MusicBrainz-discovered artists.
+    Compares artist tags against the user's root_genre_map.
+    Returns a score (higher = better match).
+    """
+    if not artist_tags or not root_genre_map:
+        return 0.0
+
+    score = 0.0
+    for tag in artist_tags:
+        tl = tag.lower().strip()
+        if tl in root_genre_map:
+            score += root_genre_map[tl] * 10.0
+        else:
+            for ug, w in root_genre_map.items():
+                if tl in ug or ug in tl:
+                    score += w * 2.0
+                    break
+    return score
+
+
 async def discover_events_via_spotify(
     access_token: str,
     top_artist_ids: List[str],
@@ -164,6 +194,10 @@ async def discover_events_via_spotify(
     """
     Discover similar artists using MusicBrainz (since Spotify recommendations
     were deprecated in Nov 2024), then generate event listings.
+
+    Now applies a 2-stage pipeline:
+      Stage 1: rank discovered artists by tag overlap (no Spotify calls)
+      Stage 2: enrich only top candidates via Spotify, cap at MAX_SHOWS_PER_CITY
     """
     logger.info(f"Discovering events via MusicBrainz for {city}")
 
@@ -185,11 +219,32 @@ async def discover_events_via_spotify(
     if not discovered:
         return {"events": [], "total": 0, "source": "musicbrainz_discovery"}
 
+    total_discovered = len(discovered)
+
+    # ── Stage 1: Rank by tag overlap, keep top candidates ────
+    scored_artists = []
+    for idx, artist in enumerate(discovered):
+        tags = artist.get("tags", [])
+        tag_score = _cheap_tag_score(tags, root_genre_map)
+        scored_artists.append((-tag_score, idx, artist))
+
+    scored_artists.sort()
+    candidate_cap = min(PREFILTER_CANDIDATES_PER_CITY, len(scored_artists))
+    candidates = [item[2] for item in scored_artists[:candidate_cap]]
+
+    logger.info(
+        f"MusicBrainz prefilter: {total_discovered} artists -> "
+        f"{len(candidates)} candidates"
+    )
+
+    # ── Stage 2: Spotify enrichment for candidates only ──────
     venues = _get_venues_for_city(city)
-    dates = _generate_event_dates(len(discovered), date_from, date_to)
+    dates = _generate_event_dates(len(candidates), date_from, date_to)
 
     events = []
-    for i, artist in enumerate(discovered):
+    spotify_calls = 0
+
+    for i, artist in enumerate(candidates):
         name = artist["name"]
         tags = artist.get("tags", [])
 
@@ -199,6 +254,7 @@ async def discover_events_via_spotify(
         spotify_url = ""
         try:
             search_result = await spotify_service.search_artist(access_token, name)
+            spotify_calls += 1
             sp_artists = search_result.get("artists", {}).get("items", [])
             if sp_artists:
                 sp = sp_artists[0]
@@ -234,8 +290,20 @@ async def discover_events_via_spotify(
             "source": "musicbrainz_discovery",
         })
 
+    # ── Cap to MAX_SHOWS_PER_CITY ────────────────────────────
+    # Events are already ordered by tag relevance from Stage 1, but if we want
+    # to re-sort by a combined score we could. For now, the Stage-1 ordering
+    # plus Spotify enrichment gives a good result. Just enforce the cap.
+    capped = events[:MAX_SHOWS_PER_CITY]
+
+    logger.info(
+        f"MusicBrainz discovery: {total_discovered} found -> "
+        f"{len(candidates)} enriched ({spotify_calls} Spotify calls) -> "
+        f"{len(capped)} returned (cap={MAX_SHOWS_PER_CITY})"
+    )
+
     return {
-        "events": events,
-        "total": len(events),
+        "events": capped,
+        "total": len(capped),
         "source": "musicbrainz_discovery",
     }
