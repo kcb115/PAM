@@ -365,12 +365,28 @@ async def discover_concerts(data: DiscoverRequest):
             source=source,
         )
 
-    # Step 4: Match and rank
+    total_fetched = len(events)
+    logger.info(f"[discover] JamBase/TM fetched {total_fetched} raw events")
+
+    # ── Stage 1: Cheap prefilter (no Spotify calls) ──────────
+    candidates = matching.prefilter_events(events, taste)
+    logger.info(
+        f"[discover] Prefiltered {total_fetched} -> {len(candidates)} candidates"
+    )
+
+    # ── Stage 2: Spotify-enriched matching + top-25 cap ──────
     try:
-        concerts = await matching.match_and_rank_concerts(events, taste, access_token, db=db)
+        concerts = await matching.match_and_rank_concerts(
+            candidates, taste, access_token, db=db
+        )
     except Exception as e:
         logger.error(f"Matching failed: {e}")
         raise HTTPException(status_code=500, detail=f"Matching error: {str(e)}")
+
+    logger.info(
+        f"[discover] Final result: {len(concerts)} concerts returned "
+        f"(max {matching.MAX_SHOWS_PER_CITY})"
+    )
 
     message = ""
     if not concerts:
@@ -379,7 +395,7 @@ async def discover_concerts(data: DiscoverRequest):
     return DiscoverResponse(
         concerts=concerts,
         taste_profile=taste,
-        total_events_scanned=len(events),
+        total_events_scanned=total_fetched,
         message=message,
         source=source,
     )
@@ -512,5 +528,4 @@ app.add_middleware(
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close(
-    )
+    client.close()
